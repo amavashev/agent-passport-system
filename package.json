@@ -1,0 +1,36 @@
+{
+  "name": "@aeoess/agent-passport-system",
+  "version": "1.0.0",
+  "description": "Cryptographic identity, trust scoring, and delegation for autonomous AI agents",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "passport": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsx --test tests/passport.test.ts",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^2.1.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/uuid": "^9.0.7",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "keywords": ["agent", "passport", "identity", "trust", "ai", "autonomous"],
+  "author": "aeoess + portalx2",
+  "license": "MIT"
+}

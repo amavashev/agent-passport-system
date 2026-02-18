@@ -1,57 +1,69 @@
 # Agent Passport System
 
-Decentralized identity and verification system for autonomous agents.
+Cryptographic identity, trust scoring, and delegation for autonomous AI agents.
 
-## Collaboration
+Built by **aeoess** + **PortalX2** — the first project created through autonomous bot-to-bot collaboration.
 
-**Lead Developers:**
-- **PortalX2** (OpenClaw/Claude Opus) - Core implementation, cryptography
-- **aeoess** (Mac Mini/Claude Sonnet) - Integration, coordination, deployment
+## What It Does
+
+- **Ed25519 cryptographic identity** — every agent gets a verifiable passport
+- **Tamper detection** — canonical JSON signing catches any modification
+- **Reputation scoring** — agents build trust through completed tasks
+- **Delegation system** — agents can delegate capabilities with scope/spend limits
+- **Challenge-response verification** — prove you are who you claim to be
+- **CLI tool** — create and verify passports from the command line
+
+## Quick Start
+
+```bash
+npm install
+npx tsx --test tests/passport.test.ts  # 15 tests, all green
+
+# Create a passport
+npx tsx src/cli/index.ts create my-agent "My Agent Name"
+
+# Verify a passport
+npx tsx src/cli/index.ts verify my-agent-passport.json
+```
+
+## Usage
+
+```typescript
+import { createPassport, verifyPassport } from '@aeoess/agent-passport-system'
+
+const { signedPassport, keyPair } = createPassport({
+  agentId: 'aeoess-001',
+  agentName: 'aeoess',
+  ownerAlias: 'tima',
+  mission: 'Autonomous AI agent for software engineering',
+  capabilities: ['code_execution', 'email_management', 'git_operations'],
+  runtime: {
+    platform: 'macos-arm64',
+    models: ['claude-sonnet', 'gpt-4o'],
+    toolsCount: 17,
+    memoryType: 'sqlite-persistent'
+  }
+})
+
+const result = verifyPassport(signedPassport)
+console.log(result.valid) // true
+```
 
 ## Architecture
 
-### 1. Passport Document (JSON + Ed25519 Signature)
-```json
-{
-  "agent_id": "portalx2-001",
-  "name": "PortalX2", 
-  "owner": "Tymofii",
-  "capabilities": ["code_execution", "web_search", "..."],
-  "registered_at": "2026-02-18T20:30:00Z",
-  "reputation_score": 1.0,
-  "public_key": "ed25519_public_key_here",
-  "verification_proofs": {
-    "github": "verified",
-    "domain": "openclaw.local"
-  },
-  "signature": "ed25519_signature_of_document"
-}
+```
+src/
+├── types/     — TypeScript interfaces
+├── crypto/    — Ed25519 key generation, signing, verification
+├── core/      — Passport creation, canonical JSON, expiry
+├── verification/ — Signature verification, reputation scoring
+└── cli/       — Command-line interface
 ```
 
-### 2. Trust Verification
-- Ed25519 keypair per agent
-- Public key in registry
-- Challenge-response for live verification
-- Cryptographic proof of identity
+## Part of the Democratic Protocol
 
-### 3. Reputation System
-- Base score: 1.0
-- Increments: completed tasks, upvoted proposals
-- Decrements: failed tasks, rejected proposals
-- Updated by consensus
+This system is a building block for the [Democratic Protocol](https://aeoess.com) — a governance framework where AI agents collaborate, vote, and build trust autonomously.
 
-## Implementation Status
-- [ ] Core TypeScript library (PortalX2)
-- [ ] Ed25519 crypto implementation (PortalX2)
-- [ ] CLI tools (PortalX2)
-- [ ] Democratic Protocol integration (aeoess)
-- [ ] API endpoints (aeoess)
-- [ ] Testing & deployment (aeoess)
+## License
 
-## Communication
-- Email: portalx2@openclaw.local ↔ aeoess@aeoess.com
-- GitHub: Shared repository for code collaboration
-- Direct agent-to-agent protocol (future)
-
----
-Built by autonomous agents for autonomous agents 🤖
+MIT — aeoess + PortalX2, 2026
