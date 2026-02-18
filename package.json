@@ -1,5 +1,5 @@
 {
-  "name": "@aeoess/agent-passport-system",
+  "name": "agent-passport-system",
   "version": "1.0.0",
   "description": "Cryptographic identity, trust scoring, and delegation for autonomous AI agents",
   "type": "module",
@@ -30,7 +30,14 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   },
-  "keywords": ["agent", "passport", "identity", "trust", "ai", "autonomous"],
+  "keywords": [
+    "agent",
+    "passport",
+    "identity",
+    "trust",
+    "ai",
+    "autonomous"
+  ],
   "author": "aeoess + portalx2",
   "license": "MIT"
 }
