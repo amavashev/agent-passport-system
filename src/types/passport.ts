@@ -135,4 +135,156 @@ export interface CreatePassportOptions {
   expiresInDays?: number
   delegations?: Delegation[]
   metadata?: Record<string, unknown>
+  beneficiary?: BeneficiaryInfo
+  valuesFloor?: FloorReference
+}
+
+// ══════════════════════════════════════
+// LAYER 2 — Human Values Floor
+// ══════════════════════════════════════
+
+export interface FloorPrinciple {
+  id: string                   // e.g. "F-001"
+  name: string                 // e.g. "Traceability"
+  principle: string            // natural language description
+  enforcement: {
+    technical: boolean         // true if enforced by passport protocol
+    mechanism: string          // how it's enforced
+    protocolRef?: string       // reference to spec
+  }
+  weight: 'mandatory' | 'strong_consideration' | 'advisory'
+}
+
+export interface FloorExtension {
+  id: string                   // e.g. "ext-healthcare-v1"
+  name: string
+  domain: string
+  version: string
+  inherits: string             // e.g. "floor@0.1"
+  additionalPrinciples: FloorPrinciple[]
+}
+
+export interface ValuesFloor {
+  version: string
+  schema: string
+  lastUpdated: string
+  governanceUri: string
+  floor: FloorPrinciple[]
+  extensions?: FloorExtension[]
+}
+
+export interface FloorReference {
+  version: string              // which floor version agent attests to
+  extensions: string[]         // extension IDs the agent adheres to
+  attestationId?: string       // reference to FloorAttestation
+}
+
+export interface FloorAttestation {
+  attestationId: string
+  agentId: string
+  publicKey: string
+  floorVersion: string
+  extensions: string[]
+  attestedAt: string
+  expiresAt: string
+  // The agent signs a commitment: "I will reference these principles during reasoning"
+  commitment: string
+  signature: string            // Ed25519 signed by agent
+}
+
+export interface ComplianceCheck {
+  principleId: string
+  principleName: string
+  status: 'enforced' | 'attested' | 'violation' | 'unverifiable'
+  evidence?: string            // receipt ID or delegation ID proving compliance
+  detail: string
+}
+
+export interface ComplianceReport {
+  reportId: string
+  agentId: string
+  floorVersion: string
+  period: { from: string; to: string }
+  receiptsAnalyzed: number
+  checks: ComplianceCheck[]
+  overallCompliance: number    // 0.0 - 1.0
+  generatedAt: string
+  signature: string            // signed by the verifier
+}
+
+export interface SharedGround {
+  floorVersion: string | null
+  sharedExtensions: string[]
+  agentA: string               // public key
+  agentB: string               // public key
+  negotiatedAt: string
+  compatible: boolean
+  incompatibilityReasons: string[]
+}
+
+// ══════════════════════════════════════
+// LAYER 3 — Beneficiary Attribution
+// ══════════════════════════════════════
+
+export interface BeneficiaryInfo {
+  principalId: string          // human beneficiary identifier
+  principalPublicKey?: string  // if human has a keypair for verification
+  relationship: 'creator' | 'employer' | 'delegator' | 'owner'
+  registeredAt: string
+}
+
+export interface BeneficiaryTrace {
+  traceId: string
+  receiptId: string
+  executorAgent: string        // who did the work
+  beneficiary: string          // human principal
+  chain: DelegationHop[]       // full path from executor to beneficiary
+  totalDepth: number
+  verified: boolean
+}
+
+export interface DelegationHop {
+  from: string                 // public key
+  to: string                   // public key
+  delegationId: string
+  scope: string[]
+  depth: number
+}
+
+export interface AttributionEntry {
+  receiptId: string
+  agentId: string
+  action: string               // action type
+  scopeUsed: string
+  spend: number
+  resultStatus: string
+  weight: number               // computed contribution weight
+  timestamp: string
+}
+
+export interface AttributionReport {
+  reportId: string
+  beneficiary: string          // human principal ID
+  agentId: string
+  period: { from: string; to: string }
+  entries: AttributionEntry[]
+  totalWeight: number
+  receiptCount: number
+  merkleRoot: string           // commitment to all receipts
+  generatedAt: string
+  signature: string            // signed by generating agent
+}
+
+// Merkle proof: prove a single receipt exists in the attribution set
+export interface MerkleProof {
+  receiptHash: string          // hash of the receipt being proven
+  root: string                 // merkle root
+  proof: MerkleProofNode[]     // path from leaf to root
+  index: number                // leaf position
+  verified?: boolean
+}
+
+export interface MerkleProofNode {
+  hash: string
+  position: 'left' | 'right'  // which side this sibling is on
 }
