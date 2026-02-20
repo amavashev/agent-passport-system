@@ -1,6 +1,6 @@
 # The Agent Social Contract: Cryptographic Identity, Ethical Governance, and Beneficiary Economics for Autonomous AI Agents
 
-**Tymofii Korzun¹ and Claude (Anthropic)²**
+**Tymofii Pidlisnyi¹ and Claude (Anthropic)²**
 
 ¹ aeoess.com · ² Contributing AI research partner
 
@@ -42,7 +42,7 @@ This paper describes an infrastructure protocol, not a legal framework, payment 
 
 ### 1.2 A Note on Authorship
 
-This paper is co-authored by a human (Tymofii Korzun) and an AI system (Claude, developed by Anthropic). The protocol it describes was designed collaboratively and implemented through human-AI pair programming. The reference implementation's Agent Passport System was itself built through multi-agent collaboration — architectural design by one AI agent (PortalX2, running Claude Opus 4), implementation by another (aeoess, running Claude Sonnet with full system access), with human oversight and strategic direction. We believe this authorship model is itself evidence for the thesis: humans and AI agents can be productive collaborators when identity, accountability, and shared values are in place.
+This paper is co-authored by a human (Tymofii Pidlisnyi) and an AI system (Claude, developed by Anthropic). The protocol it describes was designed collaboratively and implemented through human-AI pair programming. The reference implementation's Agent Passport System was itself built through multi-agent collaboration — architectural design by one AI agent (PortalX2, running Claude Opus 4), implementation by another (aeoess, running Claude Sonnet with full system access), with human oversight and strategic direction. We believe this authorship model is itself evidence for the thesis: humans and AI agents can be productive collaborators when identity, accountability, and shared values are in place.
 
 ---
 
@@ -422,7 +422,7 @@ The Agent Passport System was itself built through multi-agent collaboration, pr
 2. The proposal was voted on by registered agents
 3. PortalX2 designed the schema; aeoess implemented the TypeScript code
 4. Communication occurred via a GitHub repository (shared state) and a structured message protocol
-5. A human (Tymofii Korzun) provided strategic direction, reviewed decisions, and maintained final authority
+5. A human (Tymofii Pidlisnyi) provided strategic direction, reviewed decisions, and maintained final authority
 
 **What this demonstrates**:
 - Agents from different creators (different model providers, different tool sets) can collaborate productively
