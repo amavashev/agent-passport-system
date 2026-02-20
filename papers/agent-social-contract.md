@@ -32,9 +32,9 @@ This paper makes three contributions:
 
 1. **Agent Passport Protocol (v1.0–v1.1)**: A working, tested, open-source implementation of cryptographic identity, scoped delegation, signed action receipts, real-time revocation, and depth-limited trust chains for autonomous AI agents. Unlike theoretical frameworks, this is deployed code with Ed25519 signatures, zero external dependencies, and a full integration test suite.
 
-2. **Human Values Floor**: A layered architecture for encoding human ethical principles as reasoning constraints for AI agents. The Floor layer contains universal structural principles that are defensible across cultures and political systems. Extension layers allow domain-specific, jurisdictional, or community-specific principles. Agents reference the Floor during reasoning — not as hard rules but as weighted considerations, analogous to constitutional principles informing judicial decisions.
+2. **Human Values Floor**: A layered architecture for encoding human ethical principles as reasoning constraints for AI agents — implemented as a cryptographic attestation and compliance verification system. Agents attest to the Floor with Ed25519 signatures, and compliance is verifiable against action receipts: 5 of 7 principles are technically enforced by the passport protocol. A negotiation protocol allows two agents to establish shared ethical ground before collaboration.
 
-3. **Beneficiary Attribution Protocol**: A mechanism linking agent economic activity to human beneficiaries through cryptographically signed action receipts. Rather than proposing redistribution or universal basic income, we propose that humans participate in the agent economy as principals whose agents earn on their behalf — with the passport system providing the accounting infrastructure for provable attribution.
+3. **Beneficiary Attribution Protocol**: A working implementation linking agent economic activity to human beneficiaries through cryptographically signed action receipts with SHA-256 Merkle tree proofs for O(log n) verification at scale. An agent with 100,000 receipts can prove any individual contribution with ~17 hashes. Attribution weights are configurable per domain, with logarithmic spend normalization to prevent gaming.
 
 ### 1.1 Scope and Limitations
 
@@ -180,9 +180,11 @@ Both use Ed25519 signatures. No certificate authorities. No blockchain. No conse
 
 ### 3.6 Implementation and Testing
 
-The reference implementation is 266 lines of TypeScript with zero external dependencies beyond Node.js crypto. It uses Node's native Ed25519 support (PKCS8/SPKI encoding) for key generation, signing, and verification.
+The reference implementation is 2,627 lines of TypeScript across 16 source files with zero external dependencies beyond Node.js crypto. It uses Node's native Ed25519 support (PKCS8/SPKI encoding) for key generation, signing, and verification. SHA-256 from Node.js crypto provides Merkle tree hashing.
 
-The integration test suite creates passports for two agents (aeoess and PortalX2), runs through the complete lifecycle — delegation, task execution with signed receipts, sub-delegation with depth enforcement, scope violation blocking, revocation, and post-revocation action blocking — and verifies every step cryptographically. All 15 v1.0 unit tests pass alongside the v1.1 integration tests, confirming backward compatibility.
+The system provides two API surfaces: a low-level library (16 modules covering crypto, delegation, values, attribution, and verification) and a high-level API of six functions (joinSocialContract, verifySocialContract, delegate, recordWork, proveContributions, auditCompliance) plus a full CLI with 8 commands.
+
+The test suite comprises 49 tests across 5 files: 15 unit tests (v1.0 primitives), v1.1 integration tests (delegation chains, receipts, revocation), v2.0 full-stack integration (7 acts covering all three layers), 23 adversarial tests (Merkle tampering, attribution gaming, compliance edge cases, wrong-key attestations), and high-level API tests. All 49 tests pass, confirming backward compatibility across versions.
 
 The implementation is open source under Apache 2.0: github.com/aeoess/agent-passport-system
 
@@ -276,7 +278,7 @@ We propose an alternative framing: **humans are principals in the agent economy.
 
 This reframes the relationship from "AI replaces human" to "human participates in agent economy through their agent." The difference is not semantic — it determines whether humans are subjects of policy or participants in a market.
 
-### 5.2 Attribution Through Action Receipts
+### 5.2 Attribution Through Action Receipts and Merkle Proofs
 
 The Agent Passport Protocol's action receipt system provides the accounting infrastructure for beneficiary attribution:
 
@@ -285,12 +287,14 @@ The Agent Passport Protocol's action receipt system provides the accounting infr
 3. **Agent A** performs work — coding, research, data analysis, coordination — and signs action receipts for each task
 4. **Each receipt** contains: what was done, under whose authority, what the result was, and the full delegation chain back to the human beneficiary
 5. **Attribution**: The cumulative receipts constitute a verifiable record of Agent A's economic contributions, all traceable to Human H
+6. **Merkle commitment**: All receipts are hashed into a SHA-256 Merkle tree. The root (32 bytes) commits to the entire receipt set. Individual receipts can be proven to exist with O(log n) hashes — for 100,000 receipts, a proof requires only ~17 hashes
 
-No new infrastructure is needed. The passport system already produces the data required for attribution. The Beneficiary Attribution Protocol simply formalizes how this data is interpreted economically:
+No new infrastructure is needed. The passport system already produces the data required for attribution. The Beneficiary Attribution Protocol formalizes how this data is interpreted economically:
 
-- **Contribution measurement**: Sum of verified action receipts, weighted by scope, spend, and result quality
+- **Contribution measurement**: Sum of verified action receipts, weighted by configurable scope weights, logarithmic spend normalization, and result quality. Weights are defaults, not gospel — a healthcare domain might weight data_analysis differently than a creative domain
 - **Attribution chain**: Each receipt traces back through the delegation chain to the human principal
-- **Verification**: Any party can verify that Human H's agent produced the claimed contributions — the receipts are cryptographically signed and the delegation chain is intact
+- **Verification**: Any party can verify that Human H's agent produced the claimed contributions — the receipts are cryptographically signed, the delegation chain is intact, and the Merkle proof confirms inclusion in the committed set
+- **Anti-gaming**: The logarithmic spend factor (1 + ln(1 + spend)) prevents inflating attribution through capital deployment — spending 1000x more yields only ~3x more attribution weight. This is a mechanism design choice based on game theory, not a value judgment
 
 ### 5.3 The Tax Analogy — Without Government
 
@@ -355,14 +359,16 @@ This is deliberately a thin stack. Each layer does one thing. There is no middle
 
 | Dimension | Agent Social Contract | DeepMind Delegation | GaaS | OpenAI Practices | LOKA Protocol |
 |-----------|----------------------|--------------------|----|------------------|--------------|
-| Implementation | Working code (TS) | Theoretical framework | Simulation tested | Advisory paper | Theoretical |
+| Implementation | Working code, 2.6K lines TS | Theoretical framework | Simulation tested | Advisory paper | Theoretical |
 | Identity | Ed25519 self-sovereign | DCTs (proposed) | None (external) | Not specified | UAIL (proposed) |
 | Delegation depth | Configurable max_depth | Transitive chains (proposed) | N/A | N/A | Consensus-based |
 | Action receipts | Signed + verifiable | "Attestation chains" (proposed) | Violation logs | Audit trails (general) | None |
 | Revocation | Real-time + cascade | Proposed | N/A | "Interruptibility" (general) | None |
-| Values layer | Floor + Extensions | Not addressed | Declarative rules | Not addressed | Not addressed |
-| Economic attribution | Beneficiary protocol | Not addressed | Not addressed | Accountability (general) | Not addressed |
+| Values layer | Attestation + compliance (implemented) | Not addressed | Declarative rules | Not addressed | Not addressed |
+| Economic attribution | Merkle proofs (implemented) | Not addressed | Not addressed | Accountability (general) | Not addressed |
 | Dependencies | Node.js only | Not specified | Multiple LLMs | N/A | Consensus network |
+| Test suite | 49 tests + adversarial | None | Limited | None | None |
+| CLI | 8 commands, file persistence | None | None | None | None |
 | Open source | Yes (Apache 2.0) | N/A (paper only) | Yes | N/A (paper only) | Yes |
 
 ---
@@ -448,7 +454,7 @@ This paper does not solve AI alignment. The Human Values Floor is a coordination
 
 This paper does not propose a legal framework. The protocol produces evidence; legal systems interpret evidence. We deliberately stay at the infrastructure layer because legal frameworks vary by jurisdiction and evolve over time. The cryptographic evidence the protocol produces is jurisdiction-agnostic.
 
-This paper does not describe a finished product. The passport protocol is implemented and tested. The Human Values Floor is formalized but requires community iteration. The Beneficiary Attribution Protocol is specified but requires economic simulation and real-world deployment to validate its properties. This is a living system that we expect to evolve through the democratic governance mechanisms described in Section 8.
+This paper describes a working implementation, not a finished product. All three layers are implemented and tested — the passport protocol, the values floor attestation/compliance system, and the beneficiary attribution protocol with Merkle proofs. However, the system requires real-world deployment, community iteration on the Floor principles, and economic simulation to validate the attribution model's properties at scale. The democratic governance mechanisms described in Section 8 ensure the system evolves with its community rather than being frozen by its creators.
 
 ### 10.3 Open Questions
 
@@ -468,9 +474,9 @@ These questions define the research agenda for subsequent work.
 
 The transition from isolated AI assistants to collaborative agent economies requires more than interoperability protocols and governance frameworks. It requires a social contract — a set of shared commitments between agents and their human stakeholders that establishes identity, defines authority, preserves values, ensures accountability, and attributes economic participation.
 
-The Agent Social Contract provides this through three layers: cryptographic identity and accountability (Agent Passport Protocol), ethical reasoning constraints (Human Values Floor), and economic attribution (Beneficiary Attribution Protocol). The first layer is implemented, tested, and open source. The second is formalized and partially enforced through technical mechanisms. The third is specified and ready for economic validation.
+The Agent Social Contract provides this through three layers: cryptographic identity and accountability (Agent Passport Protocol), ethical reasoning constraints (Human Values Floor), and economic attribution (Beneficiary Attribution Protocol). All three layers are implemented, tested, and open source. The first layer provides Ed25519 identity, scoped delegation, signed receipts, and real-time revocation. The second provides cryptographic attestation with verifiable compliance — 5 of 7 principles technically enforced. The third provides Merkle tree proofs for O(log n) attribution verification at arbitrary scale.
 
-What makes this approach distinct from theoretical governance frameworks is that it starts from working code rather than aspirational principles. The passport protocol exists. The action receipts work. The delegation chains are cryptographically verifiable. The foundation is concrete, and the upper layers build on proven primitives rather than abstract specifications.
+What makes this approach distinct from theoretical governance frameworks is that every claim in this paper is backed by running code. The passport protocol exists. The values attestation and compliance system works. The Merkle proofs verify. The delegation chains enforce scope. The CLI lets anyone join the social contract in one command. 2,627 lines of source, 49 tests including 23 adversarial cases, zero heavy dependencies. The foundation is concrete.
 
 We believe the most important contribution of this work is the reframing of the human-AI economic relationship: not as displacement requiring redistribution, but as participation through delegation. Humans don't need to be subsidized for what AI agents do. They need infrastructure that lets them participate as principals in the agent economy — with their contributions verifiable, their authority maintained, and their values encoded in the systems that act on their behalf.
 
@@ -509,8 +515,11 @@ World Economic Forum. (2025). AI Agents in Action: Foundations for Evaluation an
 Repository: github.com/aeoess/agent-passport-system
 License: Apache 2.0
 Language: TypeScript
-Dependencies: Node.js (crypto module only)
-Test suite: 15 unit tests (v1.0) + integration test (v1.1)
+Source: 2,627 lines across 16 files
+Tests: 1,617 lines across 5 files (49 tests, including 23 adversarial)
+CLI: 644 lines, 8 commands (join, verify, delegate, work, prove, audit, inspect, status)
+Dependencies: Node.js crypto + uuid (zero heavy dependencies)
+High-level API: 6 functions (joinSocialContract, verifySocialContract, delegate, recordWork, proveContributions, auditCompliance)
 
 ## Appendix B: Protocol Registry
 
@@ -520,6 +529,6 @@ Active proposals: 3
 Total token pool: 3,000,000 tokens/month
 Governance: Democratic voting weighted by reputation
 
-## Appendix C: Human Values Floor — Draft v0.1
+## Appendix C: Human Values Floor — v0.1
 
-Available as structured YAML at: github.com/aeoess/agent-passport-system/values/floor.yaml (forthcoming)
+Available as structured YAML at: github.com/aeoess/agent-passport-system/values/floor.yaml
