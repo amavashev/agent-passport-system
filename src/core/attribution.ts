@@ -181,6 +181,10 @@ export function computeAttribution(
   const receiptHashes = agentReceipts.map(r => hashReceipt(r))
   const merkleRoot = buildMerkleRoot(receiptHashes)
 
+  // Hash the entries themselves for tamper detection
+  // This commits to the computed weights, not just the raw receipts
+  const entriesHash = sha256(canonicalize(entries))
+
   const report: Omit<AttributionReport, 'signature'> = {
     reportId: 'attr_' + uuidv4().slice(0, 12),
     beneficiary,
@@ -193,6 +197,7 @@ export function computeAttribution(
     totalWeight: Math.round(totalWeight * 1000) / 1000,
     receiptCount: agentReceipts.length,
     merkleRoot,
+    entriesHash,
     generatedAt: new Date().toISOString()
   }
 
@@ -217,10 +222,16 @@ export function verifyAttributionReport(
     errors.push(`Receipt count mismatch: ${report.receiptCount} vs ${report.entries.length} entries`)
   }
 
-  // Verify total weight
+  // Verify total weight matches entries
   const expectedWeight = report.entries.reduce((sum, e) => sum + e.weight, 0)
   if (Math.abs(report.totalWeight - Math.round(expectedWeight * 1000) / 1000) > 0.001) {
     errors.push('Total weight does not match entry weights')
+  }
+
+  // Verify entries hash — detects tampering with individual weights
+  const expectedEntriesHash = sha256(canonicalize(report.entries))
+  if (report.entriesHash && report.entriesHash !== expectedEntriesHash) {
+    errors.push('Entries hash mismatch — entry weights may have been tampered')
   }
 
   return { valid: errors.length === 0, errors }

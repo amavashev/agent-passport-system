@@ -271,6 +271,7 @@ export interface AttributionReport {
   totalWeight: number
   receiptCount: number
   merkleRoot: string           // commitment to all receipts
+  entriesHash: string          // SHA-256 of computed entries (tamper detection)
   generatedAt: string
   signature: string            // signed by generating agent
 }
