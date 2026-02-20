@@ -40,11 +40,56 @@ export interface ReputationScore {
 }
 
 export interface Delegation {
+  delegationId: string
   delegatedTo: string
+  delegatedBy: string
   scope: string[]
   expiresAt: string
   spendLimit?: number
   spentAmount?: number
+  maxDepth: number
+  currentDepth: number
+  createdAt: string
+  signature: string  // signed by delegator
+}
+
+export interface ActionReceipt {
+  receiptId: string
+  version: string
+  timestamp: string
+  agentId: string
+  delegationId: string
+  action: {
+    type: string
+    target: string
+    method?: string
+    scopeUsed: string
+    spend?: { amount: number; currency: string }
+  }
+  result: {
+    status: 'success' | 'failure' | 'partial'
+    summary: string
+  }
+  delegationChain: string[]  // public key fingerprints from principal to executor
+  signature: string  // signed by executing agent
+}
+
+export interface RevocationRecord {
+  revocationId: string
+  delegationId: string
+  revokedBy: string   // public key of original delegator
+  revokedAt: string
+  reason: string
+  signature: string   // signed by original delegator
+}
+
+export interface DelegationStatus {
+  valid: boolean
+  revoked: boolean
+  expired: boolean
+  depthExceeded: boolean
+  revokedAt?: string
+  errors: string[]
 }
 
 export interface SignedPassport {
