@@ -68,17 +68,21 @@ function parseYamlFloor(yamlContent: string): ValuesFloor {
   let currentPrinciple: Partial<FloorPrinciple> | null = null
   let inFloor = false
   let inEnforcement = false
+  let inSection = false  // true once we enter 'floor:' or 'extensions:'
 
   for (const line of lines) {
     const trimmed = line.trim()
     if (trimmed.startsWith('#') || trimmed === '') continue
 
-    if (trimmed.startsWith('version:')) floor.version = extractVal(trimmed)
-    if (trimmed.startsWith('schema:')) floor.schema = extractVal(trimmed)
-    if (trimmed.startsWith('last_updated:')) floor.lastUpdated = extractVal(trimmed)
-    if (trimmed.startsWith('governance_uri:')) floor.governanceUri = extractVal(trimmed)
+    // Top-level fields — only before entering a section
+    if (!inSection) {
+      if (trimmed.startsWith('version:')) { floor.version = extractVal(trimmed); continue }
+      if (trimmed.startsWith('schema:')) { floor.schema = extractVal(trimmed); continue }
+      if (trimmed.startsWith('last_updated:')) { floor.lastUpdated = extractVal(trimmed); continue }
+      if (trimmed.startsWith('governance_uri:')) { floor.governanceUri = extractVal(trimmed); continue }
+    }
 
-    if (trimmed === 'floor:') { inFloor = true; continue }
+    if (trimmed === 'floor:') { inFloor = true; inSection = true; continue }
     if (inFloor && (trimmed.startsWith('extensions:') || trimmed.startsWith('integration:'))) {
       inFloor = false; continue
     }
