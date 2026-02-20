@@ -1,9 +1,27 @@
 // Agent Passport System — Public API v2.0
 // The Agent Social Contract: Identity · Values · Attribution
 //
-// Layer 1: Cryptographic Identity & Accountability
-// Layer 2: Human Values Floor
-// Layer 3: Beneficiary Attribution
+// HIGH-LEVEL API (start here):
+//   joinSocialContract()    — create an agent in the contract
+//   verifySocialContract()  — verify another agent
+//   delegate()              — grant authority
+//   recordWork()            — sign a receipt for work done
+//   proveContributions()    — generate Merkle proofs of contributions
+//   auditCompliance()       — check agent against the Floor
+//
+// Everything else below is the implementation these build on.
+
+// ── The Social Contract (high-level) ──
+export {
+  joinSocialContract, verifySocialContract,
+  delegate, recordWork,
+  proveContributions, auditCompliance
+} from './contract.js'
+
+export type {
+  JoinOptions, SocialContractAgent, TrustVerification,
+  DelegateOptions, WorkOptions, ContributionProof
+} from './contract.js'
 
 // ── Layer 1: Identity & Accountability ──
 export { createPassport, signPassport, updatePassport, isExpired } from './core/passport.js'
@@ -34,7 +52,8 @@ export {
   traceBeneficiary,
   computeAttribution, verifyAttributionReport,
   buildMerkleRoot, generateMerkleProof, verifyMerkleProof,
-  computeCollaborationAttribution
+  computeCollaborationAttribution,
+  DEFAULT_SCOPE_WEIGHTS
 } from './core/attribution.js'
 
 // ── Types ──

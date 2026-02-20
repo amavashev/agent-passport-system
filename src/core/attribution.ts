@@ -1,12 +1,11 @@
 // Beneficiary Attribution Protocol — Trace, Attribute, Prove
 // Layer 3 of the Agent Social Contract
 //
-// This system produces EVIDENCE, not transactions.
-// It traces agent work back to human beneficiaries through
-// delegation chains and generates verifiable attribution reports
-// with Merkle proofs for O(log n) verification at scale.
-//
-// Zero new dependencies. Merkle trees use SHA-256 from Node.js crypto.
+// Design philosophy:
+//   This system produces EVIDENCE and PROOFS.
+//   Attribution weights are configurable, not hardcoded gospel.
+//   The Merkle tree is the real innovation — everything else is plumbing.
+//   Keep the plumbing clean so the innovation shines.
 
 import { v4 as uuidv4 } from 'uuid'
 import { createHash } from 'node:crypto'
@@ -21,25 +20,13 @@ import type {
 } from '../types/passport.js'
 
 // ══════════════════════════════════════
-// CRYPTOGRAPHIC PRIMITIVES
+// HASH PRIMITIVES
 // ══════════════════════════════════════
 
-/**
- * SHA-256 hash — the atomic unit of the Merkle tree.
- * We use this rather than Ed25519 because we need a hash function,
- * not a signature scheme. SHA-256 is collision-resistant, fast,
- * and universally available.
- */
 function sha256(data: string): string {
   return createHash('sha256').update(data, 'utf8').digest('hex')
 }
 
-/**
- * Hash a receipt into a leaf node for the Merkle tree.
- * Uses canonical serialization to ensure deterministic hashing —
- * the same receipt always produces the same hash regardless of
- * property ordering.
- */
 export function hashReceipt(receipt: ActionReceipt): string {
   return sha256(canonicalize(receipt))
 }
@@ -49,46 +36,33 @@ export function hashReceipt(receipt: ActionReceipt): string {
 // ══════════════════════════════════════
 
 /**
- * Trace an action receipt back to its human beneficiary.
- * 
- * The delegation chain in a receipt contains public key fingerprints
- * from the human principal to the executing agent. This function
- * reconstructs the full path, verifying each hop.
- * 
- * This is the core of the economic model: every agent action is
- * traceable to a human. Not through logging. Through cryptography.
+ * Follow the cryptographic chain from an action receipt back
+ * to the human who authorized it.
+ *
+ * This is the fundamental primitive: every agent action resolves
+ * to a human. Not through policy. Through math.
  */
 export function traceBeneficiary(
   receipt: ActionReceipt,
   delegations: Delegation[],
-  beneficiaryMap: Map<string, BeneficiaryInfo>  // publicKey -> beneficiary
+  beneficiaryMap: Map<string, BeneficiaryInfo>
 ): BeneficiaryTrace {
   const chain: DelegationHop[] = []
-
-  // Walk the delegation chain from the receipt
-  // The chain goes: [principal, ..., delegator, executor]
   const keyChain = receipt.delegationChain
 
-  // Find delegations that connect each hop
   for (let i = 0; i < keyChain.length - 1; i++) {
     const from = keyChain[i]
     const to = keyChain[i + 1]
-
-    // Find the delegation connecting these two keys
-    const delegation = delegations.find(d =>
-      d.delegatedBy === from && d.delegatedTo === to
-    )
+    const del = delegations.find(d => d.delegatedBy === from && d.delegatedTo === to)
 
     chain.push({
-      from,
-      to,
-      delegationId: delegation?.delegationId || 'unknown',
-      scope: delegation?.scope || [],
+      from, to,
+      delegationId: del?.delegationId || 'unknown',
+      scope: del?.scope || [],
       depth: i
     })
   }
 
-  // The first key in the chain should map to a human beneficiary
   const principalKey = keyChain[0]
   const beneficiary = beneficiaryMap.get(principalKey)
 
@@ -104,63 +78,68 @@ export function traceBeneficiary(
 }
 
 // ══════════════════════════════════════
-// ATTRIBUTION COMPUTATION
+// ATTRIBUTION WEIGHTS — CONFIGURABLE, NOT GOSPEL
 // ══════════════════════════════════════
 
 /**
- * Weight factors for contribution scoring.
- * 
- * These weights determine how much each aspect of an action
- * contributes to the agent's attribution score. The weights
- * are designed to reward:
- *   - Higher-scope actions (more complex work)
- *   - Successful outcomes
- *   - Economic activity (spend)
- *   - Consistency (more receipts = more reliable)
+ * Default scope weights. These are DEFAULTS, not universal truth.
+ *
+ * A healthcare protocol might weight data_analysis at 2.0.
+ * A creative protocol might weight coordination at 1.5.
+ * The protocol provides the mechanism; the community provides the values.
+ *
+ * If you don't provide custom weights, these are reasonable.
+ * If you do, yours override completely.
  */
-const SCOPE_WEIGHTS: Record<string, number> = {
+export const DEFAULT_SCOPE_WEIGHTS: Record<string, number> = {
   code_execution: 1.0,
   system_control: 0.9,
-  web_search: 0.3,
-  file_management: 0.5,
-  git_operations: 0.7,
-  email_management: 0.4,
-  browser_automation: 0.5,
   data_analysis: 0.8,
-  coordination: 0.6
+  git_operations: 0.7,
+  coordination: 0.6,
+  file_management: 0.5,
+  browser_automation: 0.5,
+  email_management: 0.4,
+  web_search: 0.3
 }
 
-const RESULT_MULTIPLIERS: Record<string, number> = {
+const RESULT_MULTIPLIER: Record<string, number> = {
   success: 1.0,
   partial: 0.5,
   failure: 0.0
 }
 
+export interface AttributionConfig {
+  scopeWeights?: Record<string, number>
+  defaultScopeWeight?: number  // for unrecognized scopes
+}
+
 /**
- * Compute attribution for a set of receipts.
- * 
- * Each receipt is weighted by:
- *   weight = scope_weight × result_multiplier × (1 + log(1 + spend))
- * 
- * The logarithmic spend factor prevents gaming by inflating spend.
- * Spending $10,000 doesn't give 100x more attribution than $100 —
- * it gives ~2.5x more. This is intentional: we want to reward
- * capability and outcome, not just capital deployment.
+ * Compute attribution with configurable weights.
+ *
+ * Formula: weight = scope_weight × result × (1 + ln(1 + spend))
+ *
+ * The logarithm on spend is the one opinion we hardcode,
+ * because it's a mechanism design choice, not a value judgment:
+ * linear spend weighting creates an arms race. Logarithmic doesn't.
+ * This is game theory, not preference.
  */
 export function computeAttribution(
   receipts: ActionReceipt[],
   agentId: string,
   beneficiary: string,
-  privateKey: string
+  privateKey: string,
+  config?: AttributionConfig
 ): AttributionReport {
+  const weights = config?.scopeWeights || DEFAULT_SCOPE_WEIGHTS
+  const defaultWeight = config?.defaultScopeWeight ?? 0.3
   const agentReceipts = receipts.filter(r => r.agentId === agentId)
 
   const entries: AttributionEntry[] = agentReceipts.map(receipt => {
-    const scopeWeight = SCOPE_WEIGHTS[receipt.action.scopeUsed] || 0.3
-    const resultMult = RESULT_MULTIPLIERS[receipt.result.status] || 0
+    const sw = weights[receipt.action.scopeUsed] ?? defaultWeight
+    const rm = RESULT_MULTIPLIER[receipt.result.status] ?? 0
     const spend = receipt.action.spend?.amount || 0
-    const spendFactor = 1 + Math.log(1 + spend)
-    const weight = scopeWeight * resultMult * spendFactor
+    const weight = sw * rm * (1 + Math.log(1 + spend))
 
     return {
       receiptId: receipt.receiptId,
@@ -176,13 +155,8 @@ export function computeAttribution(
 
   const totalWeight = entries.reduce((sum, e) => sum + e.weight, 0)
   const timestamps = entries.map(e => e.timestamp).sort()
-
-  // Generate Merkle root for all receipts
   const receiptHashes = agentReceipts.map(r => hashReceipt(r))
   const merkleRoot = buildMerkleRoot(receiptHashes)
-
-  // Hash the entries themselves for tamper detection
-  // This commits to the computed weights, not just the raw receipts
   const entriesHash = sha256(canonicalize(entries))
 
   const report: Omit<AttributionReport, 'signature'> = {
@@ -203,7 +177,6 @@ export function computeAttribution(
 
   const canonical = canonicalize(report)
   const signature = sign(canonical, privateKey)
-
   return { ...report, signature }
 }
 
@@ -214,90 +187,65 @@ export function verifyAttributionReport(
   const errors: string[] = []
 
   const { signature, ...unsigned } = report
-  const canonical = canonicalize(unsigned)
-  const sigValid = verify(canonical, signature, publicKey)
-  if (!sigValid) errors.push('Invalid attribution report signature')
+  if (!verify(canonicalize(unsigned), signature, publicKey)) {
+    errors.push('Invalid attribution report signature')
+  }
 
   if (report.receiptCount !== report.entries.length) {
     errors.push(`Receipt count mismatch: ${report.receiptCount} vs ${report.entries.length} entries`)
   }
 
-  // Verify total weight matches entries
   const expectedWeight = report.entries.reduce((sum, e) => sum + e.weight, 0)
   if (Math.abs(report.totalWeight - Math.round(expectedWeight * 1000) / 1000) > 0.001) {
     errors.push('Total weight does not match entry weights')
   }
 
-  // Verify entries hash — detects tampering with individual weights
-  const expectedEntriesHash = sha256(canonicalize(report.entries))
-  if (report.entriesHash && report.entriesHash !== expectedEntriesHash) {
-    errors.push('Entries hash mismatch — entry weights may have been tampered')
+  if (report.entriesHash) {
+    const expected = sha256(canonicalize(report.entries))
+    if (report.entriesHash !== expected) {
+      errors.push('Entries hash mismatch — weights may have been tampered')
+    }
   }
 
   return { valid: errors.length === 0, errors }
 }
 
 // ══════════════════════════════════════
-// MERKLE TREE — O(log n) ATTRIBUTION PROOFS
+// MERKLE TREE
 // ══════════════════════════════════════
+// This is the real contribution. Everything above is plumbing.
+// The Merkle tree lets you commit to N receipts in 32 bytes
+// and prove any individual receipt in O(log N) hashes.
+// This is how you scale attribution to millions of actions.
 
 /**
- * A Merkle tree over action receipt hashes.
- * 
- * Why this matters:
- * An agent might produce 100,000 receipts over a year. To prove
- * attribution, you'd need to transmit all of them. With a Merkle
- * tree, you commit to ALL receipts with a single 32-byte root hash.
- * Then you can prove any individual receipt exists with ~17 hashes
- * (log2(100,000) ≈ 17). This is O(log n) verification for O(n) data.
- * 
- * The same structure Bitcoin uses to prove transactions exist in a
- * block. We use it to prove agent contributions exist in an
- * attribution period.
- * 
- * Properties:
- *   - Collision resistance: SHA-256 makes it infeasible to find two
- *     different receipt sets with the same root
- *   - Tamper evidence: changing any receipt changes the root
- *   - Inclusion proofs: prove one receipt without revealing others
- *   - Sorted leaves: receipts are sorted by hash for determinism
- */
-
-/**
- * Build a Merkle root from an array of leaf hashes.
- * If the number of leaves is odd, the last leaf is duplicated.
- * Returns the root hash.
+ * Build a Merkle root from leaf hashes.
+ * Leaves are sorted for determinism — same set always produces same root.
+ * Odd levels duplicate the last node (standard Bitcoin-style).
  */
 export function buildMerkleRoot(leafHashes: string[]): string {
   if (leafHashes.length === 0) return sha256('empty')
   if (leafHashes.length === 1) return leafHashes[0]
 
-  // Sort leaves for deterministic tree construction
   const sorted = [...leafHashes].sort()
-
   let level = sorted
+
   while (level.length > 1) {
-    const nextLevel: string[] = []
+    const next: string[] = []
     for (let i = 0; i < level.length; i += 2) {
       const left = level[i]
-      const right = i + 1 < level.length ? level[i + 1] : left // duplicate if odd
-      nextLevel.push(sha256(left + right))
+      const right = i + 1 < level.length ? level[i + 1] : left
+      next.push(sha256(left + right))
     }
-    level = nextLevel
+    level = next
   }
 
   return level[0]
 }
 
 /**
- * Generate a Merkle proof for a specific receipt.
- * 
- * The proof is a path from the leaf to the root, containing
- * the sibling hashes at each level. A verifier can reconstruct
- * the root from the leaf hash and the proof, then compare
- * against the known root.
- * 
- * Proof size: O(log n) hashes — ~17 hashes for 100,000 receipts.
+ * Generate an inclusion proof for one receipt in the tree.
+ * Returns the sibling hashes needed to recompute the root.
  */
 export function generateMerkleProof(
   leafHashes: string[],
@@ -314,80 +262,48 @@ export function generateMerkleProof(
   let index = targetIndex
 
   while (level.length > 1) {
-    const nextLevel: string[] = []
-    const siblingIndex = index % 2 === 0 ? index + 1 : index - 1
+    const next: string[] = []
+    const sibling = index % 2 === 0 ? index + 1 : index - 1
 
-    if (siblingIndex < level.length && siblingIndex !== index) {
-      proof.push({
-        hash: level[siblingIndex],
-        position: index % 2 === 0 ? 'right' : 'left'
-      })
+    if (sibling < level.length && sibling !== index) {
+      proof.push({ hash: level[sibling], position: index % 2 === 0 ? 'right' : 'left' })
     } else {
-      // Duplicate case (odd number of nodes, last node paired with itself)
-      proof.push({
-        hash: level[index],
-        position: 'right'
-      })
+      proof.push({ hash: level[index], position: 'right' })
     }
 
     for (let i = 0; i < level.length; i += 2) {
       const left = level[i]
       const right = i + 1 < level.length ? level[i + 1] : left
-      nextLevel.push(sha256(left + right))
+      next.push(sha256(left + right))
     }
 
-    level = nextLevel
+    level = next
     index = Math.floor(index / 2)
   }
 
-  return {
-    receiptHash: targetHash,
-    root: level[0],
-    proof,
-    index: targetIndex
-  }
+  return { receiptHash: targetHash, root: level[0], proof, index: targetIndex }
 }
 
 /**
- * Verify a Merkle proof — confirm a receipt hash is committed
- * to by the given Merkle root.
- * 
- * This is the verification that a third party performs:
- *   1. Start with the receipt hash
- *   2. Combine with each proof node (respecting position)
- *   3. Compare final hash against the claimed root
- * 
- * If they match, the receipt is provably part of the committed set.
- * No other information about the set is revealed.
+ * Verify a Merkle inclusion proof.
+ * Recompute the root from the leaf + proof, compare against claimed root.
  */
 export function verifyMerkleProof(proof: MerkleProof): boolean {
-  let currentHash = proof.receiptHash
+  let hash = proof.receiptHash
 
   for (const node of proof.proof) {
-    if (node.position === 'left') {
-      currentHash = sha256(node.hash + currentHash)
-    } else {
-      currentHash = sha256(currentHash + node.hash)
-    }
+    hash = node.position === 'left'
+      ? sha256(node.hash + hash)
+      : sha256(hash + node.hash)
   }
 
-  return currentHash === proof.root
+  return hash === proof.root
 }
 
 // ══════════════════════════════════════
-// MULTI-AGENT ATTRIBUTION AGGREGATION
+// MULTI-AGENT COLLABORATION ATTRIBUTION
 // ══════════════════════════════════════
 
-/**
- * When multiple agents collaborate on a task, compute relative
- * attribution across all participants.
- * 
- * Returns a map of agentId -> percentage of total contribution.
- * This is the primitive that payment systems consume:
- *   "Agent A did 40% of the work, Agent B did 35%, Agent C did 25%"
- * 
- * Each percentage is backed by signed receipts with Merkle proofs.
- */
 export interface CollaborationAttribution {
   collaborationId: string
   participants: {
@@ -398,63 +314,57 @@ export interface CollaborationAttribution {
     receiptCount: number
   }[]
   totalWeight: number
-  merkleRoot: string           // Merkle root over ALL participants' receipts
+  merkleRoot: string
   generatedAt: string
 }
 
 export function computeCollaborationAttribution(
   allReceipts: ActionReceipt[],
-  beneficiaryMap: Map<string, string>  // agentId -> beneficiary
+  beneficiaryMap: Map<string, string>,
+  config?: AttributionConfig
 ): CollaborationAttribution {
-  // Group receipts by agent
+  const weights = config?.scopeWeights || DEFAULT_SCOPE_WEIGHTS
+  const defaultWeight = config?.defaultScopeWeight ?? 0.3
+
   const byAgent = new Map<string, ActionReceipt[]>()
-  for (const receipt of allReceipts) {
-    const existing = byAgent.get(receipt.agentId) || []
-    existing.push(receipt)
-    byAgent.set(receipt.agentId, existing)
+  for (const r of allReceipts) {
+    const list = byAgent.get(r.agentId) || []
+    list.push(r)
+    byAgent.set(r.agentId, list)
   }
 
-  // Compute weight for each agent
   const participants: CollaborationAttribution['participants'] = []
   let totalWeight = 0
 
   for (const [agentId, receipts] of byAgent) {
-    const agentWeight = receipts.reduce((sum, r) => {
-      const scopeWeight = SCOPE_WEIGHTS[r.action.scopeUsed] || 0.3
-      const resultMult = RESULT_MULTIPLIERS[r.result.status] || 0
+    const w = receipts.reduce((sum, r) => {
+      const sw = weights[r.action.scopeUsed] ?? defaultWeight
+      const rm = RESULT_MULTIPLIER[r.result.status] ?? 0
       const spend = r.action.spend?.amount || 0
-      return sum + scopeWeight * resultMult * (1 + Math.log(1 + spend))
+      return sum + sw * rm * (1 + Math.log(1 + spend))
     }, 0)
 
-    totalWeight += agentWeight
+    totalWeight += w
     participants.push({
       agentId,
       beneficiary: beneficiaryMap.get(agentId) || 'unknown',
-      weight: Math.round(agentWeight * 1000) / 1000,
-      percentage: 0, // computed after totaling
+      weight: Math.round(w * 1000) / 1000,
+      percentage: 0,
       receiptCount: receipts.length
     })
   }
 
-  // Compute percentages
   for (const p of participants) {
-    p.percentage = totalWeight > 0
-      ? Math.round((p.weight / totalWeight) * 10000) / 100
-      : 0
+    p.percentage = totalWeight > 0 ? Math.round((p.weight / totalWeight) * 10000) / 100 : 0
   }
 
-  // Sort by percentage descending
   participants.sort((a, b) => b.percentage - a.percentage)
-
-  // Merkle root over all receipts
-  const allHashes = allReceipts.map(r => hashReceipt(r))
-  const merkleRoot = buildMerkleRoot(allHashes)
 
   return {
     collaborationId: 'collab_' + uuidv4().slice(0, 12),
     participants,
     totalWeight: Math.round(totalWeight * 1000) / 1000,
-    merkleRoot,
+    merkleRoot: buildMerkleRoot(allReceipts.map(r => hashReceipt(r))),
     generatedAt: new Date().toISOString()
   }
 }

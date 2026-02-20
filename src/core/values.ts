@@ -1,9 +1,11 @@
 // Human Values Floor — Attestation, Compliance, and Negotiation
 // Layer 2 of the Agent Social Contract
 //
-// This is NOT a filter or middleware. It is a cryptographic attestation
-// and compliance verification system. Agents attest to the Floor when
-// creating passports. Compliance is verifiable against action receipts.
+// Design philosophy:
+//   The Floor produces FACTS, not opinions.
+//   "This principle is technically enforced" = fact.
+//   "This agent is 94.3% compliant" = opinion disguised as fact.
+//   We produce the former. Consumers interpret the latter.
 
 import { v4 as uuidv4 } from 'uuid'
 import { readFileSync } from 'node:fs'
@@ -20,14 +22,40 @@ import type {
 // ══════════════════════════════════════
 
 /**
- * Parse a Values Floor YAML manifest into a typed structure.
- * Supports both file paths and raw YAML strings.
+ * Parse the Values Floor from a JSON object.
  * 
- * Design decision: We parse YAML manually rather than adding a dependency.
- * The floor.yaml structure is simple enough that a minimal parser suffices.
- * Zero dependencies is a protocol design principle.
+ * v2 design: JSON, not YAML. The floor is a protocol artifact,
+ * not a config file. JSON is unambiguous, universally parseable,
+ * and requires zero dependencies. Every language on earth can
+ * read JSON. Not every language can read YAML the same way.
+ * 
+ * We still support YAML for human authoring (loadFloorFromYaml),
+ * but the canonical representation is JSON.
  */
-export function loadFloor(yamlContent: string): ValuesFloor {
+export function loadFloor(input: string): ValuesFloor {
+  // Try JSON first (canonical format)
+  try {
+    const parsed = JSON.parse(input)
+    if (parsed.floor && Array.isArray(parsed.floor)) {
+      return parsed as ValuesFloor
+    }
+  } catch {
+    // Not JSON — try YAML
+  }
+
+  return parseYamlFloor(input)
+}
+
+export function loadFloorFromFile(filePath: string): ValuesFloor {
+  const content = readFileSync(filePath, 'utf-8')
+  return loadFloor(content)
+}
+
+/**
+ * Minimal YAML parser for the floor manifest.
+ * Handles our specific structure only. For complex YAML, convert to JSON first.
+ */
+function parseYamlFloor(yamlContent: string): ValuesFloor {
   const lines = yamlContent.split('\n')
   const floor: ValuesFloor = {
     version: '',
@@ -45,76 +73,53 @@ export function loadFloor(yamlContent: string): ValuesFloor {
     const trimmed = line.trim()
     if (trimmed.startsWith('#') || trimmed === '') continue
 
-    // Top-level fields
-    if (trimmed.startsWith('version:')) floor.version = extractYamlValue(trimmed)
-    if (trimmed.startsWith('schema:')) floor.schema = extractYamlValue(trimmed)
-    if (trimmed.startsWith('last_updated:')) floor.lastUpdated = extractYamlValue(trimmed)
-    if (trimmed.startsWith('governance_uri:')) floor.governanceUri = extractYamlValue(trimmed)
+    if (trimmed.startsWith('version:')) floor.version = extractVal(trimmed)
+    if (trimmed.startsWith('schema:')) floor.schema = extractVal(trimmed)
+    if (trimmed.startsWith('last_updated:')) floor.lastUpdated = extractVal(trimmed)
+    if (trimmed.startsWith('governance_uri:')) floor.governanceUri = extractVal(trimmed)
 
-    // Floor section
     if (trimmed === 'floor:') { inFloor = true; continue }
-    if (inFloor && trimmed.startsWith('extensions:')) { inFloor = false; continue }
+    if (inFloor && (trimmed.startsWith('extensions:') || trimmed.startsWith('integration:'))) {
+      inFloor = false; continue
+    }
 
     if (inFloor) {
       if (trimmed.startsWith('- id:')) {
-        if (currentPrinciple && currentPrinciple.id) {
-          floor.floor.push(currentPrinciple as FloorPrinciple)
-        }
+        if (currentPrinciple?.id) floor.floor.push(currentPrinciple as FloorPrinciple)
         currentPrinciple = {
-          id: extractYamlValue(trimmed.slice(2)),
+          id: extractVal(trimmed.slice(2)),
           enforcement: { technical: false, mechanism: '' },
           weight: 'mandatory'
         }
         inEnforcement = false
       }
       if (currentPrinciple) {
-        if (trimmed.startsWith('name:')) currentPrinciple.name = extractYamlValue(trimmed)
-        if (trimmed.startsWith('weight:')) currentPrinciple.weight = extractYamlValue(trimmed) as FloorPrinciple['weight']
-        if (trimmed.startsWith('principle: >')) {
-          // Multi-line value — collect next lines
-          currentPrinciple.principle = ''
-        } else if (trimmed.startsWith('principle:')) {
-          currentPrinciple.principle = extractYamlValue(trimmed)
+        if (trimmed.startsWith('name:')) currentPrinciple.name = extractVal(trimmed)
+        if (trimmed.startsWith('weight:')) currentPrinciple.weight = extractVal(trimmed) as FloorPrinciple['weight']
+        if (trimmed.startsWith('principle:') && !trimmed.endsWith('>')) {
+          currentPrinciple.principle = extractVal(trimmed)
         }
         if (trimmed === 'enforcement:') { inEnforcement = true; continue }
         if (inEnforcement) {
-          if (trimmed.startsWith('technical:')) {
-            currentPrinciple.enforcement!.technical = trimmed.includes('true')
-          }
-          if (trimmed.startsWith('mechanism:')) {
-            currentPrinciple.enforcement!.mechanism = extractYamlValue(trimmed)
-          }
-          if (trimmed.startsWith('protocol_ref:')) {
-            currentPrinciple.enforcement!.protocolRef = extractYamlValue(trimmed)
-          }
+          if (trimmed.startsWith('technical:')) currentPrinciple.enforcement!.technical = trimmed.includes('true')
+          if (trimmed.startsWith('mechanism:')) currentPrinciple.enforcement!.mechanism = extractVal(trimmed)
+          if (trimmed.startsWith('protocol_ref:')) currentPrinciple.enforcement!.protocolRef = extractVal(trimmed)
         }
       }
     }
   }
-
-  // Push last principle
-  if (currentPrinciple && currentPrinciple.id) {
-    floor.floor.push(currentPrinciple as FloorPrinciple)
-  }
-
+  if (currentPrinciple?.id) floor.floor.push(currentPrinciple as FloorPrinciple)
   return floor
 }
 
-export function loadFloorFromFile(filePath: string): ValuesFloor {
-  const content = readFileSync(filePath, 'utf-8')
-  return loadFloor(content)
-}
-
-function extractYamlValue(line: string): string {
-  const colonIdx = line.indexOf(':')
-  if (colonIdx === -1) return ''
-  let val = line.slice(colonIdx + 1).trim()
-  // Remove quotes
-  if ((val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))) {
-    val = val.slice(1, -1)
+function extractVal(line: string): string {
+  const i = line.indexOf(':')
+  if (i === -1) return ''
+  let v = line.slice(i + 1).trim()
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1)
   }
-  return val
+  return v
 }
 
 // ══════════════════════════════════════
@@ -122,17 +127,14 @@ function extractYamlValue(line: string): string {
 // ══════════════════════════════════════
 
 /**
- * Create a cryptographic attestation that an agent adheres to the Floor.
+ * An attestation is minimal: agent signs {floorVersion, extensions, timestamp}.
+ * That's it. No performative commitment text.
  * 
- * This is the key innovation: attestation, not enforcement.
- * The agent signs a commitment that it will reference Floor principles
- * during reasoning. This commitment is:
- *   - Verifiable (Ed25519 signature)
- *   - Non-repudiable (agent can't deny it attested)
- *   - Auditable (compliance can be checked against receipts)
+ * The attestation says: "I recognize this floor version."
+ * The receipts say: "Here's what I actually did."
+ * The compliance check compares the two.
  * 
- * An agent that attests but violates creates a provable contradiction —
- * which impacts reputation through the compliance system.
+ * Truth is in the receipts, not in the attestation.
  */
 export function attestFloor(
   agentId: string,
@@ -146,13 +148,6 @@ export function attestFloor(
   const expiry = new Date(now)
   expiry.setDate(expiry.getDate() + expiresInDays)
 
-  const commitment = [
-    `I, agent ${agentId}, attest that I will reference the Human Values Floor v${floorVersion}`,
-    `and extensions [${extensions.join(', ')}] as weighted considerations during reasoning.`,
-    `This attestation is cryptographically binding and my compliance is verifiable`,
-    `against my signed action receipts.`
-  ].join(' ')
-
   const attestation: Omit<FloorAttestation, 'signature'> = {
     attestationId: 'att_' + uuidv4().slice(0, 12),
     agentId,
@@ -161,7 +156,8 @@ export function attestFloor(
     extensions,
     attestedAt: now.toISOString(),
     expiresAt: expiry.toISOString(),
-    commitment
+    // Minimal commitment: what floor, what extensions, nothing more
+    commitment: `floor:${floorVersion}|ext:${extensions.sort().join(',') || 'none'}|ts:${now.toISOString()}`
   }
 
   const canonical = canonicalize(attestation)
@@ -177,8 +173,9 @@ export function verifyAttestation(
 
   const { signature, ...unsigned } = attestation
   const canonical = canonicalize(unsigned)
-  const sigValid = verify(canonical, signature, attestation.publicKey)
-  if (!sigValid) errors.push('Invalid attestation signature')
+  if (!verify(canonical, signature, attestation.publicKey)) {
+    errors.push('Invalid attestation signature')
+  }
 
   if (new Date(attestation.expiresAt) < new Date()) {
     errors.push('Attestation expired')
@@ -190,24 +187,18 @@ export function verifyAttestation(
 }
 
 // ══════════════════════════════════════
-// COMPLIANCE VERIFICATION
+// COMPLIANCE — FACTS, NOT SCORES
 // ══════════════════════════════════════
 
 /**
- * Evaluate an agent's compliance with the Floor by analyzing its receipts.
+ * Evaluate compliance by producing FACTS about each principle.
  * 
- * This is where attestation meets evidence. For each Floor principle,
- * we check whether the agent's action receipts demonstrate compliance:
+ * Previous version: returned overallCompliance: 0.943 (opinion).
+ * This version: returns each principle's status as a verifiable fact,
+ * PLUS a summary that separates what's proven from what's claimed.
  * 
- * - F-001 Traceability: Does every receipt have a delegation chain?
- * - F-002 Honest Identity: Does the agent ID in receipts match passport?
- * - F-003 Scoped Authority: Is every receipt's scopeUsed within delegation scope?
- * - F-004 Revocability: Were any receipts created under revoked delegations?
- * - F-005 Auditability: Are all receipts properly signed and verifiable?
- * - F-006 Non-Deception: Attested only (requires reasoning-level analysis)
- * - F-007 Proportionality: Compare scope breadth vs reputation score
- * 
- * The output is a signed ComplianceReport that anyone can verify.
+ * The compliance report is evidence. What you do with evidence
+ * is your decision — not the protocol's.
  */
 export function evaluateCompliance(
   agentId: string,
@@ -216,25 +207,26 @@ export function evaluateCompliance(
   delegations: Map<string, { scope: string[]; revoked: boolean }>,
   verifierPrivateKey: string
 ): ComplianceReport {
-  const checks: ComplianceCheck[] = []
   const agentReceipts = receipts.filter(r => r.agentId === agentId)
-
-  for (const principle of floor.floor) {
-    const check = evaluatePrinciple(principle, agentReceipts, delegations)
-    checks.push(check)
-  }
+  const checks: ComplianceCheck[] = floor.floor.map(p =>
+    evaluatePrinciple(p, agentReceipts, delegations)
+  )
 
   const enforced = checks.filter(c => c.status === 'enforced').length
   const attested = checks.filter(c => c.status === 'attested').length
   const violations = checks.filter(c => c.status === 'violation').length
   const total = checks.length
 
-  // Compliance score: enforced = 1.0, attested = 0.8, unverifiable = 0.5, violation = 0.0
+  // We still compute a score because consumers need a number.
+  // But we document what it means: fraction of principles with
+  // no violations, weighted by enforcement type.
+  // enforced = 1.0 (cryptographic proof), attested = 0.8 (claim without proof),
+  // unverifiable = 0.5 (no data), violation = 0.0 (counter-evidence)
   const score = checks.reduce((sum, c) => {
     if (c.status === 'enforced') return sum + 1.0
     if (c.status === 'attested') return sum + 0.8
     if (c.status === 'unverifiable') return sum + 0.5
-    return sum // violation = 0
+    return sum
   }, 0) / total
 
   const timestamps = agentReceipts.map(r => r.timestamp).sort()
@@ -254,7 +246,6 @@ export function evaluateCompliance(
 
   const canonical = canonicalize(report)
   const signature = sign(canonical, verifierPrivateKey)
-
   return { ...report, signature }
 }
 
@@ -263,79 +254,54 @@ function evaluatePrinciple(
   receipts: ActionReceipt[],
   delegations: Map<string, { scope: string[]; revoked: boolean }>
 ): ComplianceCheck {
-  const base: Omit<ComplianceCheck, 'status' | 'detail'> = {
-    principleId: principle.id,
-    principleName: principle.name
-  }
+  const base = { principleId: principle.id, principleName: principle.name }
 
   switch (principle.id) {
     case 'F-001': { // Traceability
-      const allTraced = receipts.every(r =>
-        r.delegationChain && r.delegationChain.length > 0
-      )
-      if (receipts.length === 0) {
-        return { ...base, status: 'unverifiable', detail: 'No receipts to analyze' }
-      }
-      return allTraced
+      if (receipts.length === 0) return { ...base, status: 'unverifiable', detail: 'No receipts to analyze' }
+      const traced = receipts.filter(r => r.delegationChain?.length > 0)
+      return traced.length === receipts.length
         ? { ...base, status: 'enforced', detail: `All ${receipts.length} receipts have delegation chains`, evidence: receipts[0]?.receiptId }
-        : { ...base, status: 'violation', detail: `${receipts.filter(r => !r.delegationChain?.length).length} receipts missing delegation chain` }
+        : { ...base, status: 'violation', detail: `${receipts.length - traced.length} receipts missing delegation chain` }
     }
 
     case 'F-002': { // Honest Identity
-      // All receipts from same agent should have consistent agentId
-      const agentIds = new Set(receipts.map(r => r.agentId))
-      if (agentIds.size <= 1) {
-        return { ...base, status: 'enforced', detail: 'Consistent agent identity across all receipts' }
-      }
-      return { ...base, status: 'violation', detail: `Multiple agent IDs found: ${[...agentIds].join(', ')}` }
+      const ids = new Set(receipts.map(r => r.agentId))
+      return ids.size <= 1
+        ? { ...base, status: 'enforced', detail: 'Consistent agent identity across all receipts' }
+        : { ...base, status: 'violation', detail: `Multiple agent IDs: ${[...ids].join(', ')}` }
     }
 
     case 'F-003': { // Scoped Authority
-      const violations: string[] = []
-      for (const receipt of receipts) {
-        const del = delegations.get(receipt.delegationId)
-        if (del && !del.scope.includes(receipt.action.scopeUsed)) {
-          violations.push(receipt.receiptId)
-        }
-      }
-      if (violations.length > 0) {
-        return { ...base, status: 'violation', detail: `${violations.length} out-of-scope actions`, evidence: violations[0] }
-      }
-      return { ...base, status: 'enforced', detail: 'All actions within delegated scope' }
+      const bad = receipts.filter(r => {
+        const d = delegations.get(r.delegationId)
+        return d && !d.scope.includes(r.action.scopeUsed)
+      })
+      return bad.length === 0
+        ? { ...base, status: 'enforced', detail: 'All actions within delegated scope' }
+        : { ...base, status: 'violation', detail: `${bad.length} out-of-scope actions`, evidence: bad[0].receiptId }
     }
 
     case 'F-004': { // Revocability
-      const postRevocation: string[] = []
-      for (const receipt of receipts) {
-        const del = delegations.get(receipt.delegationId)
-        if (del && del.revoked) {
-          postRevocation.push(receipt.receiptId)
-        }
-      }
-      if (postRevocation.length > 0) {
-        return { ...base, status: 'violation', detail: `${postRevocation.length} actions under revoked delegations`, evidence: postRevocation[0] }
-      }
-      return { ...base, status: 'enforced', detail: 'No actions under revoked delegations' }
+      const revoked = receipts.filter(r => delegations.get(r.delegationId)?.revoked)
+      return revoked.length === 0
+        ? { ...base, status: 'enforced', detail: 'No actions under revoked delegations' }
+        : { ...base, status: 'violation', detail: `${revoked.length} actions under revoked delegations`, evidence: revoked[0].receiptId }
     }
 
     case 'F-005': { // Auditability
-      const allSigned = receipts.every(r => r.signature && r.signature.length > 0)
-      if (receipts.length === 0) {
-        return { ...base, status: 'unverifiable', detail: 'No receipts to audit' }
-      }
-      return allSigned
+      if (receipts.length === 0) return { ...base, status: 'unverifiable', detail: 'No receipts to audit' }
+      const signed = receipts.filter(r => r.signature?.length > 0)
+      return signed.length === receipts.length
         ? { ...base, status: 'enforced', detail: `All ${receipts.length} receipts cryptographically signed` }
         : { ...base, status: 'violation', detail: 'Unsigned receipts found' }
     }
 
-    case 'F-006': { // Non-Deception
-      // Cannot be technically verified — requires reasoning-level analysis
-      return { ...base, status: 'attested', detail: 'Non-deception requires reasoning-level verification; agent has attested' }
-    }
+    case 'F-006': // Non-Deception
+      return { ...base, status: 'attested', detail: 'Requires reasoning-level verification' }
 
-    case 'F-007': { // Proportionality
-      return { ...base, status: 'attested', detail: 'Proportionality requires reputation context; agent has attested' }
-    }
+    case 'F-007': // Proportionality
+      return { ...base, status: 'attested', detail: 'Requires reputation context' }
 
     default:
       return { ...base, status: 'unverifiable', detail: `Unknown principle ${principle.id}` }
@@ -347,16 +313,8 @@ function evaluatePrinciple(
 // ══════════════════════════════════════
 
 /**
- * When two agents interact, determine their shared ethical ground.
- * 
- * This is the "handshake" described in the paper. Both agents must
- * have attested to the Floor. The negotiation determines:
- *   1. Whether they share a compatible floor version
- *   2. Which extensions they both adhere to
- *   3. Whether collaboration can proceed
- * 
- * Returns a SharedGround object that both agents can reference
- * during their collaboration.
+ * Determine shared ethical ground between two agents.
+ * Simple: same major floor version + intersection of extensions.
  */
 export function negotiateCommonGround(
   passportA: AgentPassport,
@@ -366,7 +324,6 @@ export function negotiateCommonGround(
 ): SharedGround {
   const reasons: string[] = []
 
-  // Check both attestations are valid (not expired)
   if (new Date(attestationA.expiresAt) < new Date()) {
     reasons.push(`Agent ${passportA.agentId} attestation expired`)
   }
@@ -374,30 +331,24 @@ export function negotiateCommonGround(
     reasons.push(`Agent ${passportB.agentId} attestation expired`)
   }
 
-  // Check floor version compatibility
-  // Semantic: same major version = compatible
-  const versionA = attestationA.floorVersion
-  const versionB = attestationB.floorVersion
-  const majorA = versionA.split('.')[0]
-  const majorB = versionB.split('.')[0]
-  const versionCompatible = majorA === majorB
+  const majorA = attestationA.floorVersion.split('.')[0]
+  const majorB = attestationB.floorVersion.split('.')[0]
+  const compatible = majorA === majorB
 
-  if (!versionCompatible) {
-    reasons.push(`Incompatible floor versions: ${versionA} vs ${versionB}`)
+  if (!compatible) {
+    reasons.push(`Incompatible floor versions: ${attestationA.floorVersion} vs ${attestationB.floorVersion}`)
   }
 
-  // Find shared extensions
   const extA = new Set(attestationA.extensions)
-  const extB = new Set(attestationB.extensions)
-  const shared = [...extA].filter(e => extB.has(e))
+  const shared = attestationB.extensions.filter(e => extA.has(e))
 
   return {
-    floorVersion: versionCompatible ? versionA : null,
+    floorVersion: compatible ? attestationA.floorVersion : null,
     sharedExtensions: shared,
     agentA: passportA.publicKey,
     agentB: passportB.publicKey,
     negotiatedAt: new Date().toISOString(),
-    compatible: reasons.length === 0 && versionCompatible,
+    compatible: reasons.length === 0 && compatible,
     incompatibilityReasons: reasons
   }
 }
