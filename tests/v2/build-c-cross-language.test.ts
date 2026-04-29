@@ -14,7 +14,8 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   aggregateAttributionPrimitives,
   buildContributorQueryResponse,
@@ -25,7 +26,9 @@ import {
 } from '../../src/index.js'
 import type { AttributionSettlementRecord } from '../../src/index.js'
 
-const FIXTURE_DIR = '/Users/tima/aeoess_web/specs/fixtures/build-c'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const FIXTURE_DIR = join(__dirname, 'fixtures/build-c')
 
 function loadFixtures(): Array<{ name: string; data: any }> {
   return readdirSync(FIXTURE_DIR)

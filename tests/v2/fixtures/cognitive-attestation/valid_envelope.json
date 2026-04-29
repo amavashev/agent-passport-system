@@ -1,0 +1,61 @@
+{
+  "spec_version": "1.0",
+  "model_ref": {
+    "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+    "model_version_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f081",
+    "tokenizer_version_hash": "b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f0812a",
+    "inference_provider": "neuronpedia",
+    "execution_environment": {
+      "hardware_family": "nvidia/hopper/h100-sxm5",
+      "precision": "bf16",
+      "inference_engine": "neuronpedia-hosted@2026-04",
+      "deterministic_mode": true
+    }
+  },
+  "dictionary_ref": {
+    "dictionary_id": "neuronpedia/llama3-8b-base/19-llamascope-res-32k",
+    "dictionary_version_hash": "c3d4e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f0812a3b",
+    "training_corpus_hash": null,
+    "layer_index": 19,
+    "attachment_point": "residual_stream",
+    "sae_type": "topk"
+  },
+  "token_range": {
+    "absolute_sequence_hash": "e5f60718293a4b5c6d7e8f901a2b3c4d5e6f708192a3b4c5d6e7f0812a3b4c5d",
+    "prior_state_hash": null,
+    "start_token_index": 12,
+    "end_token_index": 57,
+    "token_count": 45
+  },
+  "feature_activations": [
+    {
+      "feature_id": 20946,
+      "feature_label": "vulnerability/attack/security-adjacent",
+      "activation_statistic": "max",
+      "activation_value": 3.80,
+      "tokens_active": 3
+    }
+  ],
+  "aggregation_policy": {
+    "top_k": 32,
+    "threshold": null,
+    "attestation_epsilon": 0.5,
+    "feature_allowlist_hash": null,
+    "completeness_claim": "top_k_only",
+    "tiebreaker_rule": "lowest_feature_id",
+    "required_signer_roles": ["agent", "provider"]
+  },
+  "signatures": [
+    {
+      "signer_did": "did:key:z6MkexampleAgentKey",
+      "signer_role": "agent",
+      "signature": "base64exampleSig1"
+    },
+    {
+      "signer_did": "did:key:z6MkexampleProviderKey",
+      "signer_role": "provider",
+      "signature": "base64exampleSig2"
+    }
+  ],
+  "attestation_timestamp": "2026-04-18T20:00:00Z"
+}

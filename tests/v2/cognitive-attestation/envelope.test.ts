@@ -5,6 +5,11 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync as fsRead } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 import {
   buildAttestation,
   canonicalizeAttestation,
@@ -207,7 +212,7 @@ describe('cognitiveAttestationDigest', () => {
 describe('validateAttestationShape — paper example', () => {
   it('accepts the canonical valid_envelope.json example from the paper', () => {
     // Source: papers/paper-4/poc/schema/examples/valid_envelope.json
-    const examplePath = '/Users/tima/aeoess_web/papers/paper-4/poc/schema/examples/valid_envelope.json'
+    const examplePath = join(__dirname, '../fixtures/cognitive-attestation/valid_envelope.json')
     const raw = fsRead(examplePath, 'utf-8')
     const parsed = JSON.parse(raw)
     const r = validateAttestationShape(parsed)
