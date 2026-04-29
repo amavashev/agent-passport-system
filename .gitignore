@@ -11,5 +11,17 @@ seed-agora.mjs
 *.tgz
 oatr/
 .mcp.json
-experiments/cross-family-harness/.env
 .gstack/
+
+# 2026-04-29 internal-staging sweep — moved to ~/aeoess-private/
+experiments/
+papers/agent-social-contract-backup.md
+papers/elicitation-prompts.md
+papers/review-prompt-paper-a.md
+papers/AUDIT-V2-GATEWAY-LOGIC.md
+papers/CAUSAL-CHAIN-AUDIT.md
+papers/MATURITY-TABLE.md
+papers/consilium-paper-strategy.md
+papers/paper-2-v3-final-outline.md
+papers/paper-2-compliance-complete-outline.md
+papers/faceted-narrowing.md
