@@ -133,7 +133,7 @@ npx agent-passport-system-mcp
 
 ## Numbers
 
-2,410 tests. 8 protocol layers. 11 framework adapters. Gateway evaluation under 2ms. Zero heavy dependencies. Apache-2.0.
+2,479 tests. 8 protocol layers. 11 framework adapters. Gateway evaluation under 2ms. Zero heavy dependencies. Apache-2.0.
 
 ## Papers
 
