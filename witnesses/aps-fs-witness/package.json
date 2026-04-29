@@ -1,0 +1,27 @@
+{
+  "name": "aps-fs-witness",
+  "version": "0.1.0",
+  "description": "Independent filesystem witness for APS InstructionProvenanceReceipt. Walks declared discovery patterns, hashes files, signs a WitnessedContextRoot envelope with a witness-local Ed25519 key. Operates as a separate process from any agent.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "bin": {
+    "aps-fs-witness": "dist/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsx --test tests/witness.test.ts",
+    "start": "tsx src/index.ts"
+  },
+  "files": [
+    "dist",
+    "src",
+    "vendor",
+    "README.md"
+  ],
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
