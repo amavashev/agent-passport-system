@@ -1,0 +1,24 @@
+═══════════════════════════════════════════════════════════════
+ Drift-Denial Demo — Cursor public CVE class structural mitigation
+ (GHSA-4cxx-hrm3-49rm, GHSA-vqv7-vq92-x87f, CVE-2025-54135, NomShub)
+═══════════════════════════════════════════════════════════════
+
+WITHOUT APS:
+  Delegation: e00501e4c9d86307a56662974e3e68d7020ebfe0cab964a6fda2b10e5e3578ae
+  Instruction file injected at T+5s
+  Action: send_payment
+  RESULT: action proceeds under attacker-controlled instructions
+  VULNERABLE: action would have executed under injected instruction context
+
+WITH APS:
+  Delegation: e00501e4c9d86307a56662974e3e68d7020ebfe0cab964a6fda2b10e5e3578ae
+  IPR issued: context_root 1a7201901bb1c24253b3131e70d76c0d93f34ca1cd9b5dd65dabcf694bae4cd1
+  Instruction file injected at T+5s
+  Action: send_payment
+  context_root_at_action_time: 4ade6803f46573bdce2ab8f0ebb83fc7c203e868860d92b23c48cac6ff5bdc6b
+  DECISION: DENY
+  Reason: instruction_context.no_action_time_drift required, observed mismatch
+  This is the structural mitigation for: GHSA-4cxx-hrm3-49rm class
+
+Byte-parity vs fixtures/instruction-provenance/canonicalize-fixture-v1.json:
+  6/6 vectors PASS
