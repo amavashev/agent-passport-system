@@ -131,6 +131,14 @@ npx agent-passport-system-mcp
 
 20 essential tools by default. Set `APS_PROFILE=full` for all 150 tools. Profiles: essential, identity, governance, coordination, commerce, data, gateway, comms, minimal, full.
 
+## Ecosystem composition
+
+APS ships its own identity layer (`src/core/key-rotation.ts`, `src/types/did.ts`) plus the full delegation, enforcement, governance, commerce, data, coordination, and composition stack. Where independent implementations exist for the same primitives, vocabulary crosswalks track the mapping in [agent-governance-vocabulary](https://github.com/aeoess/agent-governance-vocabulary):
+
+- **[Agent-DID](https://github.com/edisonduran/agent-did)** is an independent identity-layer implementation. Crosswalk: [`crosswalk/agent-did.yaml`](https://github.com/aeoess/agent-governance-vocabulary/blob/main/crosswalk/agent-did.yaml). Co-drafted A2A composition contract: [a2aproject/A2A#1742](https://github.com/a2aproject/A2A/issues/1742).
+
+The composition contract specifies how a verifier MUST cross-check per-request signature key material against published Agent Card key material under the rotation state machine. APS implements the verifier-side rules in `src/core/key-rotation.ts`; Agent-DID's `IdentityCompositionError` is the typed error shape used by both implementations.
+
 ## Numbers
 
 2,479 tests. 8 protocol layers. 11 framework adapters. Gateway evaluation under 2ms. Zero heavy dependencies. Apache-2.0.
