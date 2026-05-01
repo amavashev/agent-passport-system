@@ -470,6 +470,17 @@ export {
   hexToMultibase, multibaseToHex
 } from './core/did.js'
 
+// ── A2A composition-contract §5 / §6.3 — IdentityCompositionError ──
+export {
+  IdentityCompositionError,
+  assertKeyPurpose,
+} from './errors/identity-composition-error.js'
+
+export type {
+  IdentityCompositionErrorReason,
+  IdentityCompositionErrorContext,
+} from './errors/identity-composition-error.js'
+
 // ── Key Rotation — DID Document + Identity Continuity ──
 export {
   createDIDDocument, announceKeyRotation, activateKeyRotation,

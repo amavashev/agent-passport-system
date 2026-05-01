@@ -4,6 +4,12 @@
 
 // ── DID Document (W3C DID Core) ──
 
+/**
+ * W3C DID Core DID Document with all five verification relationships
+ * typed: `authentication`, `assertionMethod`, `capabilityDelegation`,
+ * `keyAgreement`, `capabilityInvocation`. Each is an array of references
+ * (key IDs) into `verificationMethod[]`.
+ */
 export interface DIDDocument {
   '@context': string[]
   id: string                           // did:aps:<hex-public-key>
@@ -12,6 +18,8 @@ export interface DIDDocument {
   authentication: string[]             // refs to verification methods
   assertionMethod: string[]            // for signing VCs
   capabilityDelegation?: string[]      // for issuing delegations
+  keyAgreement?: string[]              // refs to verification methods used for key agreement (X25519, etc.)
+  capabilityInvocation?: string[]      // refs to verification methods authorized to invoke capabilities
   service?: ServiceEndpoint[]
   created: string
   updated: string
@@ -47,7 +55,7 @@ export interface LinkedDataProof {
   type: 'Ed25519Signature2020'
   created: string
   verificationMethod: string           // did:aps:<key>#key-1
-  proofPurpose: 'assertionMethod' | 'authentication' | 'capabilityDelegation'
+  proofPurpose: 'assertionMethod' | 'authentication' | 'capabilityDelegation' | 'capabilityInvocation'
   proofValue: string                   // base64url-encoded Ed25519 signature
 }
 

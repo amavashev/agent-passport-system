@@ -259,6 +259,8 @@ export interface RotatableDIDDocument {
   authentication: string[]         // key IDs currently authorized for auth
   assertionMethod: string[]        // key IDs currently authorized for assertions
   capabilityDelegation: string[]   // key IDs currently authorized for delegation
+  keyAgreement?: string[]          // key IDs currently authorized for key agreement (X25519, etc.)
+  capabilityInvocation?: string[]  // key IDs currently authorized to invoke capabilities
   pendingRotation?: {
     newKeyId: string
     mode: RotationMode
