@@ -121,6 +121,8 @@ Forward-looking governance. Published, tested, available.
 
 41 v2 constitutional modules: approval fatigue detection, epistemic isolation, blind evaluation, separation of powers, affected-party standing, circuit breakers, constitutional amendment, authority laundering audit, emergence detection.
 
+Wave 1 accountability primitives: Ed25519 ActionReceipt, AuthorityBoundaryReceipt, CustodyReceipt, ContestabilityReceipt, APSBundle. RFC 8785 JCS canonicalized, content-addressed, byte-match across implementations.
+
 Institutional governance: charters, offices, federation, reserves, multi-party approvals.
 
 ## MCP Server
@@ -141,7 +143,7 @@ The composition contract specifies how a verifier MUST cross-check per-request s
 
 ## Numbers
 
-2,479 tests. 8 protocol layers. 11 framework adapters. Gateway evaluation under 2ms. Zero heavy dependencies. Apache-2.0.
+2,536 tests. 8 protocol layers. 11 framework adapters. Gateway evaluation under 2ms. Zero heavy dependencies. Apache-2.0.
 
 ## Papers
 
@@ -152,6 +154,7 @@ The composition contract specifies how a verifier MUST cross-check per-request s
 - [Physics-Enforced Delegation](https://doi.org/10.5281/zenodo.19478584)
 - [Governance in the Medium](https://doi.org/10.5281/zenodo.19582550)
 - [Cognitive Attestation](https://doi.org/10.5281/zenodo.19646276)
+- [The Evidence-Safety Gap](https://doi.org/10.5281/zenodo.19914628)
 - IETF Internet-Draft: `draft-pidlisnyi-aps-00`
 - IETF Internet-Draft: draft-pidlisnyi-aps-00
 

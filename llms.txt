@@ -17,6 +17,10 @@ APS addresses the case where the delegation chain still verifies but the agent's
 
 In each case a valid signature was insufficient to deny the action. Authority admissibility — linking delegated authority to signed evidence about action so a verifier can decide whether to admit it — is the boundary APS draws.
 
+## Wave 1 accountability primitives
+
+Ed25519 ActionReceipt, AuthorityBoundaryReceipt, CustodyReceipt, ContestabilityReceipt, APSBundle. RFC 8785 JCS canonicalized, content-addressed, byte-match across implementations.
+
 ## Install
 
 - npm: `npm install agent-passport-system`
@@ -47,4 +51,5 @@ In each case a valid signature was insufficient to deny the action. Authority ad
 - Physics-Enforced Delegation: https://doi.org/10.5281/zenodo.19478584
 - Governance in the Medium: https://doi.org/10.5281/zenodo.19582550
 - Cognitive Attestation: https://doi.org/10.5281/zenodo.19646276
+- The Evidence-Safety Gap: https://doi.org/10.5281/zenodo.19914628
 - IETF Internet-Draft: draft-pidlisnyi-aps-00
