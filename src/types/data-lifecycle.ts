@@ -2,7 +2,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Data Lifecycle Governance — Types
 // ══════════════════════════════════════════════════════════════════
-// Consilium decision (6 model reviews, 2026-03-24):
+// Review decision (6 model reviews, 2026-03-24):
 //   Phase 1: Extended derivation, revocation obligations,
 //            decision lineage, purpose taxonomy
 //   "Evolve from access control into lifecycle governance"

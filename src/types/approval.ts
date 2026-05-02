@@ -2,7 +2,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Approval — Multi-Class Threshold Policies
 // ══════════════════════════════════════════════════════════════════
-// Consilium Q5 resolution: Multi-class M-of-N Ed25519 counting.
+// Review Q5 resolution: Multi-class M-of-N Ed25519 counting.
 // NOT FROST/Shamir — simple threshold counting per key class for v1.
 //
 // A MultiClassThresholdPolicy defines:

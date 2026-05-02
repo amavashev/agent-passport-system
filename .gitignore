@@ -12,6 +12,7 @@ seed-agora.mjs
 oatr/
 .mcp.json
 .gstack/
+.claude/settings.local.json
 
 # 2026-04-29 internal-staging sweep — moved to ~/aeoess-private/
 experiments/

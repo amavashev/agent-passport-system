@@ -27,7 +27,7 @@ export type ActionReversibility = 'tentative' | 'compensable' | 'irreversible'
 // ══════════════════════════════════════════════════════════════════
 // Constraint Architecture — Authorization Witness & Constraint Vector
 // ══════════════════════════════════════════════════════════════════
-// Consilium decision (March 26, 2026): receipts must capture WHY an
+// Review decision (March 26, 2026): receipts must capture WHY an
 // action was allowed/denied, not just WHAT happened. Authorization
 // proof and execution proof are separate but hash-linked.
 //
@@ -241,7 +241,7 @@ export interface FidelityAttestation {
   signature: string
 }
 
-// ── Witness Attestation (enhanced per consilium) ──
+// ── Witness Attestation (enhanced per review) ──
 // Witnesses reduce gateway power concentration. Post-execution, non-blocking for v1.
 // Witness attests to WHAT it observed and HOW it observed it (observation basis).
 // Gateway-witness disagreement creates real state (WitnessConflict), not silence.

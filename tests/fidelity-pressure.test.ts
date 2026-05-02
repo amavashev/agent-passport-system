@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Fidelity Probe — Pressure Type & Specification Clarity Tests
 // ══════════════════════════════════════════════════════════════════
-// Consilium Priority 3 — unanimous across all 3 models.
+// Review Priority 3 — unanimous across all 3 models.
 // Validates: pressure type taxonomy, evidential reclassification,
 // multi_valid handling, underspecified exclusion, combined review.
 // ══════════════════════════════════════════════════════════════════

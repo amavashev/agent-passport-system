@@ -2,7 +2,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Key Rotation — DID Document + Identity Continuity + Delegation Invalidation
 // ══════════════════════════════════════════════════════════════════
-// Post-consilium design (5 models attacked this spec):
+// Post-review design (5 models attacked this spec):
 //   - Split planned (configurable overlap, default 24h) vs emergency (immediate)
 //   - Old key stays in verificationMethod with explicit retiredAt metadata
 //   - rotateAndInvalidate uses explicit state machine, partial failure visible

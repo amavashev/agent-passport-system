@@ -10,7 +10,7 @@
 import type { FinalityState } from './finality.js'
 
 /** Escrow lifecycle states.
- *  Extended per consilium: includes partial fulfillment, orphaned, force states. */
+ *  Extended per review: includes partial fulfillment, orphaned, force states. */
 export type EscrowStatus =
   | 'held'                  // funds reserved, awaiting fulfillment
   | 'partially_fulfilled'   // some milestones met, not all
@@ -99,7 +99,7 @@ export interface DangerSignal {
 // ══════════════════════════════════════════════════════════════════
 // Escrow-Aware Revocation (Gemini S2 Q3)
 // ══════════════════════════════════════════════════════════════════
-// Consilium Q3 resolution: revocation enters locked settlement state
+// Review Q3 resolution: revocation enters locked settlement state
 // if active escrows exist. The delegation's authority drops to 0 for
 // NEW actions, but remains valid ONLY for resolution of existing escrows.
 //

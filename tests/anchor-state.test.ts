@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Anchor States — Tests
 // ══════════════════════════════════════════════════════════════════
-// Consilium Priority 6. Receipt anchor lifecycle + auto-batching.
+// Review Priority 6. Receipt anchor lifecycle + auto-batching.
 // ══════════════════════════════════════════════════════════════════
 
 import { describe, it } from 'node:test'

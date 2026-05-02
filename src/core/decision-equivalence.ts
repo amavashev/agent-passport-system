@@ -3,7 +3,7 @@
 // Decision Equivalence — Implementation
 // ══════════════════════════════════════════════════════════════════
 // Canonical boundary profiles, static compatibility, projection-based
-// comparison. No runtime negotiation. Consilium decision: 2026-03-24.
+// comparison. No runtime negotiation. Review decision: 2026-03-24.
 // ══════════════════════════════════════════════════════════════════
 
 import { createHash } from 'node:crypto'

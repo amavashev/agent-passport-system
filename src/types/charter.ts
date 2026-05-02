@@ -10,7 +10,7 @@
 // Charter sits ABOVE PrincipalIdentity in the trust hierarchy:
 //   Charter → Office → Principal → Agent → Delegation
 //
-// Consilium resolutions embedded:
+// Review resolutions embedded:
 //   Q5: Multi-class M-of-N Ed25519 counting (not FROST/Shamir for v1)
 //   GPT #8:  OfficeHolderMode (single, co_holders, threshold, vacant, interim, suspended)
 //   GPT #10: Term expiry on OfficeHolder

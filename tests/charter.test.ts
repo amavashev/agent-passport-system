@@ -232,7 +232,7 @@ describe('Charter — Create & Verify', () => {
 // Multi-Class Threshold Evaluation
 // ══════════════════════════════════════
 
-describe('Approval — Multi-Class Threshold (Consilium Q5)', () => {
+describe('Approval — Multi-Class Threshold (Review Q5)', () => {
   it('passes when all class requirements met', () => {
     const board1 = generateKeyPair()
     const board2 = generateKeyPair()

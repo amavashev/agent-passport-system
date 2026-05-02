@@ -2,7 +2,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Decision Equivalence — Canonical Boundary Profiles + Comparison
 // ══════════════════════════════════════════════════════════════════
-// Consilium decision (Claude + GPT + human, 2026-03-24):
+// Review decision (Claude + GPT + human, 2026-03-24):
 //   - Boundary profiles as registry, not negotiation protocol
 //   - Static compatibility function, not runtime handshake
 //   - Projection-based comparison for overlapping profiles

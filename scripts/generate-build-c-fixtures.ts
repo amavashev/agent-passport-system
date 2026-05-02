@@ -2,7 +2,7 @@
 // Generate cross-language fixtures for Build C. Run with:
 //   npx tsx scripts/generate-build-c-fixtures.ts
 //
-// Writes 5 JSON fixtures to /Users/tima/aeoess_web/specs/fixtures/build-c/.
+// Writes 5 JSON fixtures to $HOME/aeoess_web/specs/fixtures/build-c/.
 // Each fixture contains {description, input_receipts, period, expected_record,
 // contributor_queries: [{did, response}]}. Python (and TS) verifiers load
 // these and assert byte-identical canonical output.
@@ -31,7 +31,7 @@ import type {
   AttributionSettlementRecord,
 } from '../src/index.js'
 
-const OUT_DIR = '/Users/tima/aeoess_web/specs/fixtures/build-c'
+const OUT_DIR = `${process.env.HOME}/aeoess_web/specs/fixtures/build-c`
 mkdirSync(OUT_DIR, { recursive: true })
 
 // Derive a deterministic 32-byte private key (hex) from a label. The SDK

@@ -39,7 +39,7 @@ export { computeIdempotencyKey } from './core/idempotency.js'
 export { computeEvidenceAge, isEvidenceFresh, createSnapshotFreshness, createRotatingFreshness } from './core/freshness.js'
 export type { AttestationFreshness } from './types/passport.js'
 
-// ── Agent Attestation Architecture (Phase 1 — Consilium Build) ──
+// ── Agent Attestation Architecture (Phase 1 — Review Build) ──
 export {
   createIssuanceChallenge, verifyRuntimeAttestation,
   computePassportGrade, computeAttestationFlags, computeAttestationBundleHash,

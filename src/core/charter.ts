@@ -248,7 +248,7 @@ export function verifyCharter(
 // ══════════════════════════════════════
 
 /** Evaluate whether a set of signatures satisfies a multi-class threshold policy.
- *  All class requirements must be met (conjunction). Consilium Q5. */
+ *  All class requirements must be met (conjunction). Review Q5. */
 export function evaluateThreshold(
   policy: MultiClassThresholdPolicy,
   signatures: ApprovalSignature[],

@@ -3,7 +3,7 @@
 // Time — Hybrid Logical Clock Operations
 // ══════════════════════════════════════════════════════════════════
 // Pure functions for creating, comparing, and validating timestamps.
-// Consilium Q1: Hybrid Logical Clocks + NTP uncertainty bounds.
+// Review Q1: Hybrid Logical Clocks + NTP uncertainty bounds.
 // ══════════════════════════════════════════════════════════════════
 
 import type {
@@ -28,7 +28,7 @@ export const DEFAULT_NTP_DRIFT_MS = 50
 export const DEFAULT_SESSION_GAP_MS = 300_000
 
 /** Module-scope logical clock counter retained for backward compatibility
- *  with existing callers (v2 modules, rome-phase2 tests) that don't pass
+ *  with existing callers (v2 modules, institutional-governance-phase2 tests) that don't pass
  *  an explicit logicalTime. New code should use createHybridTimestampAt
  *  or the gateway's LogicalClock — see
  *  @aeoess/gateway src/sdk-migrated/core/logical-clock.ts. */

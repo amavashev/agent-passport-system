@@ -2,7 +2,7 @@
 // Generate cross-language fixtures for Build B. Run with:
 //   npx tsx scripts/generate-build-b-fixtures.ts
 //
-// Writes 10 JSON fixtures to /Users/tima/aeoess_web/specs/fixtures/build-b/.
+// Writes 10 JSON fixtures to $HOME/aeoess_web/specs/fixtures/build-b/.
 // Each fixture contains { kind, description, input, expected }. Python
 // and TS cross-verify tests load these and assert byte-identical
 // canonical output.
@@ -16,7 +16,7 @@ import {
   hashWeightProfile,
 } from '../src/index.js'
 
-const OUT_DIR = '/Users/tima/aeoess_web/specs/fixtures/build-b'
+const OUT_DIR = `${process.env.HOME}/aeoess_web/specs/fixtures/build-b`
 mkdirSync(OUT_DIR, { recursive: true })
 
 function write(name: string, body: unknown): void {

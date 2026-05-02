@@ -1,6 +1,6 @@
 // Copyright 2024-2026 Tymofii Pidlisnyi. Apache-2.0 license. See LICENSE.
 // Agent Attestation Architecture — Type Definitions
-// Result of 3-round consilium (Claude + GPT + Gemini + Portal ground truth)
+// Result of 3-round multi-model review (Claude + GPT + Gemini + Portal ground truth)
 //
 // Design principles:
 //   P1: Memory, not gates — system REMEMBERS, never blocks
@@ -36,7 +36,7 @@ export type EvidenceQuality =
   | 'principal_bound';  // verified human or legal entity linked to key
 
 // ── Attestation Provenance (Four-Tier Model) ──
-// Universal convergence across all consilium models
+// Universal convergence across all review models
 export type AttestationProvenance =
   | 'observed'                // Tier 0: server saw it (TLS fingerprint, IP/ASN, timing)
   | 'infrastructure_attested' // Tier 1: sandbox/runtime gateway signed it
@@ -76,7 +76,7 @@ export interface AttestedSignal {
 }
 
 // ── Observed Context (Tier 0 — Closed Schema) ──
-// Consilium correction: Tier 0 signals use a closed interface, not generic AttestedSignal[].
+// Review correction: Tier 0 signals use a closed interface, not generic AttestedSignal[].
 // The signals observable at TCP/TLS termination are finite and known.
 // This prevents implementation fragmentation ("runtime.boot_epoch" vs "bootEpoch").
 export interface ObservedContext {
@@ -134,7 +134,7 @@ export interface ProviderAttestation {
 }
 
 // ── Issuance Evidence Record ──
-// Raw evidence collected during issuance. Separated from assessment (GPT consilium correction).
+// Raw evidence collected during issuance. Separated from assessment (review correction).
 // Raw facts and issuer opinions must not blur together.
 export interface IssuanceEvidenceRecord {
   requestId: string;                          // unique issuance request ID
@@ -166,7 +166,7 @@ export interface IssuanceAssessment {
   flags: AttestationFlag[];
   verificationResults: SignalVerificationResult[];
 
-  // Derived signals (GPT consilium addition): computed by issuer from raw evidence
+  // Derived signals (review addition): computed by issuer from raw evidence
   derivedSignals?: DerivedSignal[];
 
   // Grade mutability: when/why grade was last changed
@@ -195,7 +195,7 @@ export interface SignalVerificationResult {
 }
 
 // ── Grade Change Record ──
-// Grades are mutable (Gemini consilium correction). Track when/why grade changed.
+// Grades are mutable (review correction). Track when/why grade changed.
 export interface GradeChange {
   from: PassportGrade;
   to: PassportGrade;
@@ -225,7 +225,7 @@ export interface IssuanceContext {
 // ── Passport Attestation Summary ──
 // What goes ON the public passport. Minimal by design.
 // Partners get grade + flags. Detailed posture requires gateway query.
-// (Gemini consilium: keep signal weights, cluster risk, raw data PRIVATE)
+// (review: keep signal weights, cluster risk, raw data PRIVATE)
 export interface PassportAttestationSummary {
   passportGrade: PassportGrade;
   attestationBundleHash?: string;              // hash of all evidence (verifiable without seeing evidence)
@@ -265,7 +265,7 @@ export interface IssuanceChallengeResponse {
 }
 
 // ── Workspace Manifest ──
-// Hash of workspace STRUCTURE (not content). Consilium corrections:
+// Hash of workspace STRUCTURE (not content). Review corrections:
 // - Gemini: single hash is weak, use manifest not content hash
 // - GPT: must be infrastructure-attested (Tier 1), not self-declared
 // - All: longitudinal series > single snapshot
@@ -297,7 +297,7 @@ export interface WorkspaceCheckpoint {
 }
 
 // ── Recovery Request ──
-// Mandatory correction from all consilium models:
+// Mandatory correction from all review models:
 // Recovery MUST require cryptographic proof (prior key signature or recovery key).
 // Environment matching = LOOKUP (find dossier). Crypto proof = AUTHORITY (authorize recovery).
 export interface RecoveryRequest {

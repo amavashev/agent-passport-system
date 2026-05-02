@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Denial Domains — Tests
 // ══════════════════════════════════════════════════════════════════
-// Consilium Priority 4 — unanimous that 15 facets need grouping.
+// Review Priority 4 — unanimous that 15 facets need grouping.
 // ══════════════════════════════════════════════════════════════════
 
 import { describe, it } from 'node:test'

@@ -2,7 +2,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Time — Hybrid Logical Clocks + NTP Uncertainty Bounds
 // ══════════════════════════════════════════════════════════════════
-// Consilium Q1 resolution: Hybrid Logical Clocks (Kulkarni et al. 2014)
+// Review Q1 resolution: Hybrid Logical Clocks (Kulkarni et al. 2014)
 // with NTP uncertainty bounds. Replaces 9 ad-hoc TTL patterns with
 // unified temporal semantics.
 //

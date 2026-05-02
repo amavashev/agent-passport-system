@@ -31,7 +31,7 @@ import type {
 } from '../src/index.js'
 
 // ══════════════════════════════════════
-// HybridTimestamp — Consilium Q1
+// HybridTimestamp — review Q1
 // ══════════════════════════════════════
 
 describe('Time — HybridTimestamp', () => {

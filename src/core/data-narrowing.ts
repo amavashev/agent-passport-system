@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Data Narrowing Invariant — Data Can Only Narrow Authority
 // ══════════════════════════════════════════════════════════════════
-// GPT's "Context-Bypass Attack" (consilium March 2026):
+// "Context-Bypass Attack" (review, March 2026):
 // An agent reads a data source containing authority-widening
 // instructions. The gateway must ensure data inputs can ONLY narrow
 // the ConstraintVector, never widen it.

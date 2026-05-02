@@ -1,6 +1,6 @@
 # Data Modules — Application-Layer Guidance
 
-These four capabilities were reviewed by a 6-model consilium (2026-03-24)
+These four capabilities were reviewed by a 6-model review (2026-03-24)
 and unanimously classified as application-layer concerns, not protocol primitives.
 The protocol provides the foundation; applications build these on top.
 

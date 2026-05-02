@@ -3,7 +3,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Validates: temporal spread penalizes burst evidence, rewards
 // distributed evidence, configurable window, gaming resistance.
-// Consilium Priority 2 — unanimous across all 3 models.
+// Review Priority 2 — unanimous across all 3 models.
 // Reference: Nanook PDR paper §6.4 (DOI:10.5281/zenodo.19323172)
 // ══════════════════════════════════════════════════════════════════
 

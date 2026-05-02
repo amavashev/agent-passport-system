@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Governance Posture — Tier definitions + constraint primitives
 // ══════════════════════════════════════════════════════════════════
-// Consilium Priority 5 — Gemini's framing:
+// Review Priority 5 — Gemini's framing:
 //   "behavioral failures update a governance posture tier,
 //    posture tier changes what the gateway allows by default,
 //    identity stays intact."

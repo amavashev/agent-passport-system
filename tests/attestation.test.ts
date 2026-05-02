@@ -563,10 +563,10 @@ describe('Full issuance flow (5 phases)', () => {
 })
 
 // ══════════════════════════════════════════════════════════════
-// Adversarial: Consilium Mandatory Corrections
+// Adversarial: Review Mandatory Corrections
 // ══════════════════════════════════════════════════════════════
 
-describe('Consilium mandatory corrections', () => {
+describe('Review mandatory corrections', () => {
   it('MC1: Recovery requires crypto proof, not just env matching', () => {
     const recoveryRequest: RecoveryRequest = {
       environmentSignals: { ipHash: sha256('10.0.0.1'), transportType: 'sse' },

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════
 // Anchor States — External verifiability tracking for receipts
 // ══════════════════════════════════════════════════════════════════
-// Consilium Priority 6. Gemini: "explicit receipt anchor states."
+// Review Priority 6. Gemini: "explicit receipt anchor states."
 // desiorac (A2A #1672): batch commitment lags individual receipts.
 //
 // Every receipt and batch carries an anchor state:

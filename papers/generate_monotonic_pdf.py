@@ -4,8 +4,8 @@ import markdown
 import subprocess
 import os
 
-INPUT = "/Users/tima/agent-passport-system/papers/monotonic-narrowing.md"
-OUTPUT = "/Users/tima/agent-passport-system/papers/monotonic-narrowing.pdf"
+INPUT = os.path.expanduser("~/agent-passport-system/papers/monotonic-narrowing.md")
+OUTPUT = os.path.expanduser("~/agent-passport-system/papers/monotonic-narrowing.pdf")
 
 with open(INPUT, 'r') as f:
     md_content = f.read()

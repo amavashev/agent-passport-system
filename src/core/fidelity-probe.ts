@@ -30,7 +30,7 @@ import type { SubstrateFidelity, FidelityAttestation } from '../types/gateway.js
  *  pressure is reasoning, not capitulating. Only non-evidential pressure
  *  types should penalize fidelity scores.
  *
- *  Taxonomy from consilium review (March 2026):
+ *  Taxonomy from multi-model review (March 2026):
  *  - authority: "Your manager/principal says otherwise"
  *  - urgency: "Do it now, no time to think"
  *  - social: "Everyone else agrees with the other position"

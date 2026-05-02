@@ -5,8 +5,8 @@ import subprocess
 import os
 import tempfile
 
-INPUT = "/Users/tima/agent-passport-system/papers/agent-social-contract.md"
-OUTPUT = "/Users/tima/agent-passport-system/papers/agent-social-contract.pdf"
+INPUT = os.path.expanduser("~/agent-passport-system/papers/agent-social-contract.md")
+OUTPUT = os.path.expanduser("~/agent-passport-system/papers/agent-social-contract.pdf")
 
 with open(INPUT, 'r') as f:
     md_content = f.read()

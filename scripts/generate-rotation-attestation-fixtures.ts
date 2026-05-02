@@ -112,7 +112,7 @@ function fixtureNegative(): RotatableDIDDocument {
   return buildDocument(e)
 }
 
-const OUTPUT_DIR = '/Users/tima/aeoess_web/fixtures/rotation-attestation'
+const OUTPUT_DIR = `${process.env.HOME}/aeoess_web/fixtures/rotation-attestation`
 mkdirSync(OUTPUT_DIR, { recursive: true })
 mkdirSync(join(OUTPUT_DIR, 'keys'), { recursive: true })
 

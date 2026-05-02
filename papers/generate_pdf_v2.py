@@ -5,8 +5,8 @@ import subprocess
 import os
 import tempfile
 
-INPUT = "/Users/tima/agent-passport-system/papers/monotonic-narrowing-v2.md"
-OUTPUT = "/Users/tima/agent-passport-system/papers/monotonic-narrowing-v2.pdf"
+INPUT = os.path.expanduser("~/agent-passport-system/papers/monotonic-narrowing-v2.md")
+OUTPUT = os.path.expanduser("~/agent-passport-system/papers/monotonic-narrowing-v2.pdf")
 
 with open(INPUT, 'r') as f:
     md = f.read()
