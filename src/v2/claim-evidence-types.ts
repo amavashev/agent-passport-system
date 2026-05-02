@@ -66,8 +66,6 @@ export const EvidenceProfiles: Record<ClaimType, EvidenceProfile> = {
     forbiddenSubstitutions: {
       [RecordType.ActionReceipt]:
         'Action receipts prove execution or communication, not binding commitment.',
-      [RecordType.ProvisionalStatement]:
-        'A ProvisionalStatement on its own is non-binding by default; binding status requires an explicit PromotionEvent satisfying a PromotionPolicy.',
     },
   },
 

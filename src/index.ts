@@ -1092,6 +1092,16 @@ export {
 } from './v2/claim-evidence-types.js'
 export type { EvidenceProfile } from './v2/claim-evidence-types.js'
 
+// ══════════════════════════════════════
+// Claim Verifier (Module 2)
+// ══════════════════════════════════════
+// Named 'verifyEvidenceClaim' to disambiguate from the task-routing
+// 'verifyClaim' re-exported from './core/routing.js' above.
+export { verifyEvidenceClaim } from './v2/claim-verifier.js'
+export type {
+  ClaimVerificationInput, ClaimVerificationResult,
+} from './v2/claim-verifier.js'
+
 // NOTE: 'ActionReceipt' name collides with the legacy commerce-flavored
 // ActionReceipt re-exported at line 129 (from './types/passport.js'). Alias
 // the new accountability one as 'AccountabilityActionReceipt' to preserve
