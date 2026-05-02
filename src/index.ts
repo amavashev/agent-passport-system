@@ -1093,14 +1093,25 @@ export {
 export type { EvidenceProfile } from './v2/claim-evidence-types.js'
 
 // ══════════════════════════════════════
-// Claim Verifier (Module 2)
+// Claim Verifier (Module 2 + Module 4 hook)
 // ══════════════════════════════════════
 // Named 'verifyEvidenceClaim' to disambiguate from the task-routing
 // 'verifyClaim' re-exported from './core/routing.js' above.
 export { verifyEvidenceClaim } from './v2/claim-verifier.js'
 export type {
   ClaimVerificationInput, ClaimVerificationResult,
+  OpenContestationResolver, OpenContestationLookup,
 } from './v2/claim-verifier.js'
+
+// ══════════════════════════════════════
+// Downstream Taint (Module 4) — public cascade primitive
+// ══════════════════════════════════════
+export {
+  isContestationTainting, computeDownstreamTaint,
+} from './v2/downstream-taint.js'
+export type {
+  TaintedRecord, TaintedSet, TaintCandidate,
+} from './v2/downstream-taint.js'
 
 // NOTE: 'ActionReceipt' name collides with the legacy commerce-flavored
 // ActionReceipt re-exported at line 129 (from './types/passport.js'). Alias
@@ -1112,7 +1123,7 @@ export type {
   ActionReceipt as AccountabilityActionReceipt, SideEffectClass,
   AuthorityBoundaryReceipt, BoundaryResult,
   CustodyReceipt, CustodyEventType, CustodyPurpose,
-  ContestabilityReceipt, StandingBasis, RequestedRemedy, ContestStatus,
+  ContestabilityReceipt, StandingBasis, RequestedRemedy, ContestStatus, GroundsClass,
   APSBundle, BundledReceiptRef,
 } from './v2/accountability/index.js'
 

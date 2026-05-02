@@ -26,6 +26,20 @@ export type StandingBasis =
   | 'insurer'
   | 'principal'
 
+/**
+ * Closed taxonomy for protocol-level routing of contestations. The
+ * structured peer of the free-text `grounds` field. Verifiers and
+ * downstream-taint primitives read `grounds_class` to decide cascade
+ * behavior; humans read `grounds` for context. Both fields coexist.
+ */
+export type GroundsClass =
+  | 'evidence_insufficient'
+  | 'factual_dispute'
+  | 'scope_violation'
+  | 'superseded_by_new_evidence'
+  | 'identity_dispute'
+  | 'unclassified'
+
 export type RequestedRemedy =
   | 'rollback'
   | 'review'
@@ -67,7 +81,13 @@ export interface ContestabilityReceipt extends AccountabilityReceiptBase {
   contestant: ContestabilityContestant
   /** References the contested ActionReceipt.receipt_id. */
   action_id: string
+  /** Free-text human description. The signed canonical form of this
+   *  receipt covers grounds verbatim. */
   grounds: string
+  /** Optional structured taxonomy. When present, downstream-taint and
+   *  verifier hooks may route on this value. Absent in legacy receipts;
+   *  treat absence as 'unclassified'. */
+  grounds_class?: GroundsClass
   requested_remedy: RequestedRemedy
   controller_response?: ContestabilityControllerResponse
 }

@@ -22,16 +22,22 @@
 //   - signatures, receipt_id integrity, JCS canonicality
 //   - timestamp freshness, expiry, key rotation, revocation
 //   - delegation/authority chains
-//   - contestation status of underlying receipts
 //   - cross-receipt referential integrity (e.g. that the
 //     AuthorityBoundaryReceipt.action_id matches an ActionReceipt
 //     whose receipt_id appears in a sibling record)
 //
-// Those checks belong to Module 3 (gateway integration) and Module 4
-// (contestation extension). Treat verifyEvidenceClaim as the static type-
-// system of the protocol: it tells you whether a stated set of
-// receipts could in principle satisfy a stated claim, given only the
-// claim → evidence schema in the registry.
+// Module 4 adds an optional `openContestationResolver` hook. When the
+// caller supplies it, the verifier consults the resolver per evidence
+// entry that carries a receiptId, after the static registry passes,
+// and short-circuits to a 'contested' result on a blocking status.
+// The resolver is opt-in: the SDK does not ship a contestation index,
+// only the cascade primitive in ./downstream-taint.ts. Signature,
+// freshness, and cross-receipt referential integrity remain Module 3
+// (gateway integration). Treat verifyEvidenceClaim as the static
+// type-system of the protocol: it tells you whether a stated set of
+// receipts could in principle satisfy a stated claim, given the
+// claim → evidence schema and an optional view onto the contestation
+// ledger.
 // ══════════════════════════════════════════════════════════════════
 
 import {
@@ -40,6 +46,26 @@ import {
   EvidenceProfiles,
 } from './claim-evidence-types.js'
 import type { APSBundle } from './accountability/types/bundle.js'
+import type { ContestStatus } from './accountability/types/contestability.js'
+
+/**
+ * Statuses where the contestation is open or resolved against the
+ * record. A record under one of these statuses cannot be relied on
+ * to satisfy a claim. Module 4 hook.
+ */
+const BLOCKING_CONTEST_STATUSES: readonly ContestStatus[] = [
+  'filed',
+  'under_review',
+  'upheld',
+  'remedied',
+]
+
+export type OpenContestationLookup = {
+  contestationId: string
+  status: ContestStatus
+} | null
+
+export type OpenContestationResolver = (recordId: string) => OpenContestationLookup
 
 export type ClaimVerificationResult =
   | { status: 'valid'; claimType: ClaimType; satisfiedBy: RecordType[] }
@@ -62,10 +88,23 @@ export type ClaimVerificationResult =
       claimType: ClaimType
       bundleRecord: APSBundle
     }
+  | {
+      status: 'contested'
+      claimType: ClaimType
+      contestedRecordId: string
+      contestationId: string
+      contestationStatus: ContestStatus
+    }
 
 export interface ClaimVerificationInput {
   claim: { type: ClaimType; subject: string }
-  evidence: Array<{ recordType: RecordType; record: unknown }>
+  evidence: Array<{ recordType: RecordType; record: unknown; receiptId?: string }>
+  /** Optional Module 4 hook. When provided, every evidence entry that
+   *  carries a receiptId is checked against the resolver after the
+   *  static registry passes but before the verifier returns 'valid'.
+   *  Statuses 'filed', 'under_review', 'upheld', 'remedied' all
+   *  block; 'rejected', 'abandoned', 'expired' do not. */
+  openContestationResolver?: OpenContestationResolver
 }
 
 export function verifyEvidenceClaim(input: ClaimVerificationInput): ClaimVerificationResult {
@@ -124,7 +163,25 @@ export function verifyEvidenceClaim(input: ClaimVerificationInput): ClaimVerific
     }
   }
 
-  // 6. valid.
+  // 6. contested (Module 4) — only when caller wires a resolver and
+  //    an evidence entry carries a receiptId. First blocking match wins.
+  if (input.openContestationResolver !== undefined) {
+    for (const entry of evidence) {
+      if (entry.receiptId === undefined) continue
+      const lookup = input.openContestationResolver(entry.receiptId)
+      if (lookup !== null && BLOCKING_CONTEST_STATUSES.includes(lookup.status)) {
+        return {
+          status: 'contested',
+          claimType: claim.type,
+          contestedRecordId: entry.receiptId,
+          contestationId: lookup.contestationId,
+          contestationStatus: lookup.status,
+        }
+      }
+    }
+  }
+
+  // 7. valid.
   return {
     status: 'valid',
     claimType: claim.type,

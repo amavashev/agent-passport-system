@@ -140,4 +140,79 @@ describe('verifyEvidenceClaim — Module 2 registry checks', () => {
     })
     assert.equal(result.status, 'unsupported_claim_type')
   })
+
+  // ── Module 4 — openContestationResolver hook ──
+
+  it('with no resolver returns valid as before (regression)', () => {
+    const result = verifyEvidenceClaim(
+      makeInput(ClaimType.AUTHORITY_TO_EXECUTE, [
+        {
+          recordType: RecordType.AuthorityBoundaryReceipt,
+          receiptId: 'auth_001',
+          record: {},
+        },
+      ]),
+    )
+    assert.equal(result.status, 'valid')
+  })
+
+  it('with resolver returning filed status returns contested', () => {
+    const result = verifyEvidenceClaim({
+      claim: { type: ClaimType.AUTHORITY_TO_EXECUTE, subject: SUBJECT },
+      evidence: [
+        {
+          recordType: RecordType.AuthorityBoundaryReceipt,
+          receiptId: 'auth_001',
+          record: {},
+        },
+      ],
+      openContestationResolver: () => ({
+        contestationId: 'contest_xyz',
+        status: 'filed',
+      }),
+    })
+    assert.equal(result.status, 'contested')
+    if (result.status !== 'contested') return
+    assert.equal(result.contestedRecordId, 'auth_001')
+    assert.equal(result.contestationId, 'contest_xyz')
+    assert.equal(result.contestationStatus, 'filed')
+  })
+
+  it('with resolver returning rejected status returns valid (rejected does not block)', () => {
+    const result = verifyEvidenceClaim({
+      claim: { type: ClaimType.AUTHORITY_TO_EXECUTE, subject: SUBJECT },
+      evidence: [
+        {
+          recordType: RecordType.AuthorityBoundaryReceipt,
+          receiptId: 'auth_001',
+          record: {},
+        },
+      ],
+      openContestationResolver: () => ({
+        contestationId: 'contest_xyz',
+        status: 'rejected',
+      }),
+    })
+    assert.equal(result.status, 'valid')
+  })
+
+  it('with resolver returning upheld status returns contested', () => {
+    const result = verifyEvidenceClaim({
+      claim: { type: ClaimType.AUTHORITY_TO_EXECUTE, subject: SUBJECT },
+      evidence: [
+        {
+          recordType: RecordType.AuthorityBoundaryReceipt,
+          receiptId: 'auth_001',
+          record: {},
+        },
+      ],
+      openContestationResolver: () => ({
+        contestationId: 'contest_xyz',
+        status: 'upheld',
+      }),
+    })
+    assert.equal(result.status, 'contested')
+    if (result.status !== 'contested') return
+    assert.equal(result.contestationStatus, 'upheld')
+  })
 })

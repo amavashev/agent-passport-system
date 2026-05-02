@@ -63,6 +63,12 @@ export function createContestabilityReceipt(
     requested_remedy: input.requested_remedy,
     signature: '',
   }
+  // Forward grounds_class only when provided so JCS canonicalization
+  // omits the field for legacy callers (preserves byte-identity with
+  // pre-grounds_class fixtures).
+  if (input.grounds_class !== undefined) {
+    draft.grounds_class = input.grounds_class
+  }
 
   const receipt_id = createHash('sha256')
     .update(canonicalizeJCS(draft), 'utf8')

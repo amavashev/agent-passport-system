@@ -246,6 +246,21 @@ describe('ContestabilityReceipt — construct + verify', () => {
     assert.equal(v.reason, 'INVALID_CLAIM_TYPE')
   })
 
+  it('grounds_class round-trips through verify (Module 4)', () => {
+    const r = createContestabilityReceipt(
+      baseInput({ grounds_class: 'evidence_insufficient' } as Partial<ContestabilityReceipt>),
+      CONTESTANT_PRIV,
+    )
+    assert.equal(r.grounds_class, 'evidence_insufficient')
+    const v = verifyContestabilityReceipt(r)
+    assert.equal(v.valid, true, `expected valid; got reason=${v.reason}`)
+    // Tampering grounds_class must invalidate the receipt_id (signed body).
+    const tampered: ContestabilityReceipt = { ...r, grounds_class: 'factual_dispute' }
+    const vt = verifyContestabilityReceipt(tampered)
+    assert.equal(vt.valid, false)
+    assert.equal(vt.reason, 'RECEIPT_ID_MISMATCH')
+  })
+
   it('matches the on-disk fixture byte-for-byte (no controller_response)', () => {
     const fixturePath = join(__dirname, '..', 'fixtures', 'contestability.fixture.json')
     const fixture = JSON.parse(readFileSync(fixturePath, 'utf-8')) as ContestabilityReceipt
