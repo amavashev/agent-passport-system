@@ -27,7 +27,7 @@
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build && npm test",
-    "postpublish": "cd ~/aeoess_web && node scripts/propagate.mjs --apply --commit 2>/dev/null || echo 'Propagation skipped (aeoess_web not found)'"
+    "postpublish": "if [ -d ~/aeoess_web ]; then cd ~/aeoess_web && node scripts/propagate.mjs --apply --commit; else echo 'postpublish: ~/aeoess_web not found, skipping propagation'; fi"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
