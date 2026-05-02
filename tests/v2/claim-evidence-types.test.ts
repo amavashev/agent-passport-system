@@ -39,4 +39,19 @@ describe('claim-evidence-types', () => {
     const profile = requiredEvidenceFor(ClaimType.AUTHORITY_TO_EXECUTE)
     assert.deepEqual(profile.required, [RecordType.AuthorityBoundaryReceipt])
   })
+
+  it('BATCH_ATTESTED requires APSBundle', () => {
+    const profile = requiredEvidenceFor(ClaimType.BATCH_ATTESTED)
+    assert.deepEqual(profile.required, [RecordType.APSBundle])
+    assert.deepEqual(profile.forbiddenSubstitutions, {})
+  })
+
+  it('EVIDENCE_CUSTODY_HELD requires CustodyReceipt and forbids ActionReceipt', () => {
+    const profile = requiredEvidenceFor(ClaimType.EVIDENCE_CUSTODY_HELD)
+    assert.deepEqual(profile.required, [RecordType.CustodyReceipt])
+    const reason = profile.forbiddenSubstitutions[RecordType.ActionReceipt]
+    assert.equal(typeof reason, 'string')
+    assert.ok(reason && reason.length > 0)
+    assert.match(reason!, /held the evidence/i)
+  })
 })

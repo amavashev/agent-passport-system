@@ -18,6 +18,8 @@ export enum ClaimType {
   DERIVATION_TRACED = 'DERIVATION_TRACED',
   CLAIM_CONTESTED = 'CLAIM_CONTESTED',
   CLAIM_RESOLVED = 'CLAIM_RESOLVED',
+  BATCH_ATTESTED = 'BATCH_ATTESTED',
+  EVIDENCE_CUSTODY_HELD = 'EVIDENCE_CUSTODY_HELD',
 }
 
 /**
@@ -103,6 +105,19 @@ export const EvidenceProfiles: Record<ClaimType, EvidenceProfile> = {
   [ClaimType.CLAIM_RESOLVED]: {
     required: [],
     forbiddenSubstitutions: {},
+  },
+
+  [ClaimType.BATCH_ATTESTED]: {
+    required: [RecordType.APSBundle],
+    forbiddenSubstitutions: {},
+  },
+
+  [ClaimType.EVIDENCE_CUSTODY_HELD]: {
+    required: [RecordType.CustodyReceipt],
+    forbiddenSubstitutions: {
+      [RecordType.ActionReceipt]:
+        'Action receipts prove what was done, not who held the evidence afterward.',
+    },
   },
 }
 
