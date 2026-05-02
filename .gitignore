@@ -25,3 +25,23 @@ papers/consilium-paper-strategy.md
 papers/paper-2-v3-final-outline.md
 papers/paper-2-compliance-complete-outline.md
 papers/faceted-narrowing.md
+
+# ─────────────────────────────────────────────────
+# AEOESS drift prevention — never commit these patterns.
+# These complement the pre-commit hook and CI scan.
+# ─────────────────────────────────────────────────
+specs/cc-prompts/
+specs/consilium/
+specs/briefings/
+specs/CONSILIUM-*
+specs/ROME-COMPLETE-*
+specs/DAILY-*
+specs/CC-PROMPT-*
+specs/OPEN-COMMITMENTS*
+specs/MODEL-CITIZEN*
+specs/MUTUAL-MODE*
+specs/THE-SYNTHESIS*
+specs/ERIK-NEWTON*
+/tmp-*.md
+/scratch-*.md
+*.private.md
