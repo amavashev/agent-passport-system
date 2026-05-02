@@ -1084,6 +1084,14 @@ export {
   createAPSBundle, verifyAPSBundle, computeMerkleRoot,
 } from './v2/accountability/index.js'
 
+// ══════════════════════════════════════
+// Claim → Evidence Types (skeleton)
+// ══════════════════════════════════════
+export {
+  ClaimType, RecordType, EvidenceProfiles, requiredEvidenceFor,
+} from './v2/claim-evidence-types.js'
+export type { EvidenceProfile } from './v2/claim-evidence-types.js'
+
 // NOTE: 'ActionReceipt' name collides with the legacy commerce-flavored
 // ActionReceipt re-exported at line 129 (from './types/passport.js'). Alias
 // the new accountability one as 'AccountabilityActionReceipt' to preserve
