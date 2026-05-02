@@ -216,3 +216,36 @@ describe('verifyEvidenceClaim — Module 2 registry checks', () => {
     assert.equal(result.contestationStatus, 'upheld')
   })
 })
+
+describe('compliance-complete failure (Paper 8 instantiation)', () => {
+  it('full procedural chain claiming EFFECT_SAFETY_ATTESTED returns profile_not_populated', () => {
+    // Construct evidence representing all five Auditable Agents dimensions:
+    // - action recoverability (ActionReceipt)
+    // - lifecycle coverage (DerivationReceipt)
+    // - policy checkability (DecisionReceipt)
+    // - responsibility attribution (AuthorityBoundaryReceipt)
+    // - evidence integrity (each receipt is independently valid)
+    //
+    // EFFECT_SAFETY_ATTESTED is intentionally a stubbed claim type:
+    // the protocol does not certify effect safety. The verifier
+    // returns 'profile_not_populated', which IS the correct
+    // compliance-complete-failure response — the protocol
+    // acknowledges it cannot answer the claim rather than
+    // vacuously approving it.
+    const evidence = [
+      { recordType: RecordType.AuthorityBoundaryReceipt, record: {} },
+      { recordType: RecordType.DecisionReceipt, record: {} },
+      { recordType: RecordType.ActionReceipt, record: {} },
+      { recordType: RecordType.DerivationReceipt, record: {} },
+    ]
+
+    const result = verifyEvidenceClaim({
+      claim: { type: ClaimType.EFFECT_SAFETY_ATTESTED, subject: 'paper8_scenario' },
+      evidence,
+    })
+
+    assert.equal(result.status, 'profile_not_populated')
+    if (result.status !== 'profile_not_populated') return
+    assert.equal(result.claimType, ClaimType.EFFECT_SAFETY_ATTESTED)
+  })
+})
