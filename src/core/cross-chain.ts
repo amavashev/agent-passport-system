@@ -46,11 +46,15 @@ export function createTaintLabel(
 /**
  * Merge multiple taint labels into a TaintSet.
  * Automatically detects cross-chain (multi-principal) taint.
+ * Deduplicates labels by reference — callers spreading from overlapping
+ * sources (e.g. inputTaint.labels + frame.frameTaint.labels when frame
+ * already includes inputTaint) MUST NOT produce duplicated audit entries.
  */
 export function mergeTaints(...labels: TaintLabel[]): TaintSet {
-  const principals = [...new Set(labels.map(l => l.principalId))]
+  const uniqueLabels = [...new Set(labels)]
+  const principals = [...new Set(uniqueLabels.map(l => l.principalId))]
   return {
-    labels,
+    labels: uniqueLabels,
     principals,
     isCrossChain: principals.length > 1
   }

@@ -506,7 +506,7 @@ describe('Cross-Chain Data Flow Authorization', () => {
   // ════════════════════════════════════════
 
   describe('CrossChainViolation', () => {
-    it.skip('should produce signed violation report on blocked flow — circular reference in createCrossChainViolation needs fix in src', () => {
+    it('should produce signed violation report on blocked flow', () => {
       let frame = createExecutionFrame('agent-001')
       frame = recordAccess(frame, createTaintLabel('alice', 'chain-a', 'del-001'))
       frame = recordAccess(frame, createTaintLabel('bob', 'chain-b', 'del-002'))

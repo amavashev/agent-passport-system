@@ -7,28 +7,36 @@
 
 import { createHash } from 'node:crypto'
 
-export function canonicalize(obj: unknown, _seen?: WeakSet<object>): string {
+export function canonicalize(obj: unknown, _ancestors?: WeakSet<object>): string {
   if (obj === null || obj === undefined) return 'null'
   if (obj instanceof Date) return JSON.stringify(obj)
   if (typeof obj !== 'object') return JSON.stringify(obj)
-  // Cycle detection
-  const seen = _seen ?? new WeakSet()
-  if (seen.has(obj as object)) throw new Error('Circular reference detected in canonicalize()')
-  seen.add(obj as object)
+  // Cycle detection — path-scoped (only ancestors in current traversal path).
+  // Shared sub-references that are not cycles MUST canonicalize successfully;
+  // visit-scoped detection (tracking everything ever seen) over-rejected legitimate
+  // structures like { x: leaf, y: leaf }. Output is unchanged for all cycle-free
+  // inputs, so no canonical hashes change.
+  const ancestors = _ancestors ?? new WeakSet()
+  if (ancestors.has(obj as object)) throw new Error('Circular reference detected in canonicalize()')
+  ancestors.add(obj as object)
+  let result: string
   if (Array.isArray(obj)) {
-    return '[' + obj.map(item => canonicalize(item, seen)).join(',') + ']'
+    result = '[' + obj.map(item => canonicalize(item, ancestors)).join(',') + ']'
+  } else {
+    const sorted = Object.keys(obj as Record<string, unknown>)
+      .sort()
+      .filter(key => {
+        const val = (obj as Record<string, unknown>)[key]
+        return val !== null && val !== undefined
+      })
+      .map(key => {
+        const val = (obj as Record<string, unknown>)[key]
+        return `${JSON.stringify(key)}:${canonicalize(val, ancestors)}`
+      })
+    result = '{' + sorted.join(',') + '}'
   }
-  const sorted = Object.keys(obj as Record<string, unknown>)
-    .sort()
-    .filter(key => {
-      const val = (obj as Record<string, unknown>)[key]
-      return val !== null && val !== undefined
-    })
-    .map(key => {
-      const val = (obj as Record<string, unknown>)[key]
-      return `${JSON.stringify(key)}:${canonicalize(val, seen)}`
-    })
-  return '{' + sorted.join(',') + '}'
+  ancestors.delete(obj as object)
+  return result
 }
 
 // canonicalJson — deterministic JSON serialization of an object.

@@ -104,6 +104,67 @@ describe('Canonical Serialization — Cross-Language Compatibility', () => {
   })
 })
 
+describe('Canonical Serialization — Cycle Detection (path-scoped)', () => {
+  // canonicalize() uses path-scoped cycle detection: it tracks only the
+  // ancestors of the current node, not every object ever visited.
+  // Shared sub-references that aren't actual cycles MUST canonicalize.
+  // Actual cycles (object → ancestor) MUST throw.
+  // This aligns with Python's behavior (no cycle detection — shared refs
+  // serialize, real cycles stack-overflow). The SDK adds a friendlier
+  // error for the real-cycle case.
+
+  it('canonicalizes shared sub-references in objects (was a bug pre-2026-05)', () => {
+    const leaf = { value: 42 }
+    const root = { x: leaf, y: leaf }
+    // Both x and y point to the same object — not a cycle, just shared.
+    assert.equal(canonicalize(root), '{"x":{"value":42},"y":{"value":42}}')
+  })
+
+  it('canonicalizes the same array element appearing twice', () => {
+    // The cross-chain.ts blockingLabels regression: TaintLabel reference
+    // duplicated in an array. Canonical output expands both occurrences.
+    const item = { id: 'a', name: 'shared' }
+    const arr = [item, item]
+    assert.equal(canonicalize(arr), '[{"id":"a","name":"shared"},{"id":"a","name":"shared"}]')
+  })
+
+  it('canonicalizes shared array references at different depths', () => {
+    const inner = [1, 2, 3]
+    const outer = { first: inner, second: { nested: inner } }
+    assert.equal(
+      canonicalize(outer),
+      '{"first":[1,2,3],"second":{"nested":[1,2,3]}}'
+    )
+  })
+
+  it('throws on actual self-referential cycle in object', () => {
+    const obj: Record<string, unknown> = { a: 1 }
+    obj.self = obj
+    assert.throws(() => canonicalize(obj), /Circular reference detected/)
+  })
+
+  it('throws on actual self-referential cycle in array', () => {
+    const arr: unknown[] = [1, 2]
+    arr.push(arr)
+    assert.throws(() => canonicalize(arr), /Circular reference detected/)
+  })
+
+  it('throws on indirect cycle through nested objects', () => {
+    const a: Record<string, unknown> = { name: 'a' }
+    const b: Record<string, unknown> = { name: 'b', child: a }
+    a.child = b
+    assert.throws(() => canonicalize(a), /Circular reference detected/)
+  })
+
+  it('shared ref does not pollute later siblings (path-scope correctness)', () => {
+    // After processing the first occurrence, the leaf must be removed from
+    // the ancestor set so the second occurrence is not flagged as a cycle.
+    const leaf = { v: 1 }
+    const result = canonicalize({ a: leaf, b: leaf, c: leaf })
+    assert.equal(result, '{"a":{"v":1},"b":{"v":1},"c":{"v":1}}')
+  })
+})
+
 describe('canonicalJson + canonicalHash + normalizeTimestamp (A2A#1672)', () => {
   it('canonicalJson produces identical output regardless of key insertion order', () => {
     const a = { z: 1, a: 2, m: 3 }
