@@ -4,7 +4,6 @@
 **Spec version:** v1
 **SDK target:** `agent-passport-system@2.5.0-alpha`
 **Authored:** 2026-04-30
-**Prior art:** Consilium synthesis at `~/aeoess-private/consilium/2026-04-30-*.md`
 
 ---
 
