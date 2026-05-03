@@ -1,20 +1,20 @@
 // ══════════════════════════════════════════════════════════════════
-// RESTORED 2026-05-03 — Path B (test shim) per Day 77 architecture call.
-// Original benchmark moved to private @aeoess/gateway via commit 842cd87
-// on 2026-04-17. This file is restored verbatim with one import line
+// RESTORED 2026-05-03. Original benchmark moved to private @aeoess/gateway
+// via commit 842cd87 on 2026-04-17 (boundary refactor between protocol
+// and product). This file is restored verbatim with one import line
 // changed: `createProxyGateway` is now imported from a public test-only
 // shim at `./test-helpers/test-proxy-gateway.ts`. The shim is a minimal
 // public fixture, NOT the product gateway. Numbers measured here will
 // differ from the pre-refactor SDK values cited at zenodo.org/records/19323172.
 // Methodology is identical. See tests/benchmark-results-2026-05-03.txt
-// for re-measured values and CLAIMS.md for the public-claims update.
+// for re-measured values.
 // ══════════════════════════════════════════════════════════════════
 
 // ══════════════════════════════════════════════════════════════════
 // Gateway Latency Benchmark
 // ══════════════════════════════════════════════════════════════════
-// Consilium Priority 7 — Claude: "2 hours of work, pays dividends
-// forever. When a competitor claims faster, you need data."
+// Performance regression guard. Public-facing latency claims need a
+// reproducible source.
 //
 // Measures p50/p95/p99 latency across:
 //   - Different delegation chain depths (1, 2, 3)
