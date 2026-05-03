@@ -1510,3 +1510,33 @@ export type {
   SendPaymentOpts,
   VerifyTransactionResult,
 } from './v2/payment-rails/index.js'
+
+// ── v2.6.x payment-rails / Stripe Issuing reference adapter ──────
+// Mints agent-scoped one-time virtual cards via the Stripe Issuing
+// API and intercepts issuing_authorization.request webhooks. APS
+// gates run before Stripe is told to approve, so an authorization
+// that would violate delegation scope, budget, time window, or
+// wallet-revoked status is declined at the rail boundary and never
+// settles. Test mode only; constructor refuses sk_live_ keys.
+export {
+  createStripeIssuingRail,
+  defaultMapDelegationToSpendingControls,
+  StripeIssuingRail,
+  verifyStripeSignature,
+} from './v2/payment-rails/index.js'
+
+export type {
+  StripeAuthorization,
+  StripeAuthorizationDecision,
+  StripeAuthorizationEvent,
+  StripeCardholderRef,
+  StripeDelegationLookup,
+  StripeFetchLike,
+  StripeIssuingConfig,
+  StripeMerchantData,
+  StripeSpendingControls,
+  StripeSpendingControlsMapper,
+  StripeSpendingLimit,
+  StripeSpendingLimitInterval,
+  StripeVirtualCard,
+} from './v2/payment-rails/index.js'
