@@ -1,0 +1,38 @@
+{
+  "mandate": {
+    "vct": "mandate.checkout.1",
+    "checkout_jwt": "",
+    "checkout_hash": "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+    "payee": {
+      "id": "merch:store-002",
+      "name": "Specific Store",
+      "url": "https://store.example"
+    },
+    "items": [
+      {
+        "id": "item-shirt-l",
+        "name": "Large Shirt",
+        "quantity": 1,
+        "unit_price": {
+          "currency": "USD",
+          "value": 27999
+        }
+      }
+    ],
+    "total": {
+      "currency": "USD",
+      "value": 27999
+    },
+    "cnf": {
+      "jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "My6-jSfLcyOzpAHBwTtd1kvMwOEOzaHCtdEaA3eaheU"
+      }
+    },
+    "iat": 1777838400,
+    "exp": 1780516800
+  },
+  "signer_did": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5",
+  "signature": "fe4349edebd3fcbdfc1a53c027f32897c6d35c8f69e3dd93f48b29ac5571c57cfe002dac34f58a2450c649f11601ca18fc23caa45e7f3fb8527a5c33c6a9940d"
+}

@@ -1510,3 +1510,48 @@ export type {
   SendPaymentOpts,
   VerifyTransactionResult,
 } from './v2/payment-rails/index.js'
+
+// ── AP2 v0.2 interop (Google Agent Payments Protocol) ────────────
+// Pinned to AP2 v0.2 (April 2026). Crosswalk between APS V2Delegation
+// and AP2 mandate dicts. See docs/governance/ap2-interop.md.
+export {
+  AP2_VERSION,
+  ap2MandateToApsDelegation,
+  apsToAp2CartMandate,
+  apsToAp2IntentMandate,
+  apsToAp2OpenPaymentMandate,
+  apsToAp2PaymentMandate,
+  signAp2Mandate,
+  verifyAp2Mandate,
+} from './v2/payment-rails/index.js'
+
+export type {
+  AP2Amount,
+  AP2CheckoutConstraint,
+  AP2CheckoutMandate,
+  AP2Cnf,
+  AP2Item,
+  AP2Mandate,
+  AP2Merchant,
+  AP2OpenCheckoutMandate,
+  AP2OpenPaymentMandate,
+  AP2PaymentConstraint,
+  AP2PaymentInstrument,
+  AP2PaymentMandate,
+  AP2VctCheckout,
+  AP2VctOpenCheckout,
+  AP2VctOpenPayment,
+  AP2VctPayment,
+  Ap2VerifyReason,
+  Ap2VerifyResult,
+  Ap2ToApsOptions,
+  ApsToAp2CartOptions,
+  ApsToAp2IntentOptions,
+  ApsToAp2OpenPaymentOptions,
+  ApsToAp2PaymentOptions,
+  CartDetails,
+  CartMandate,
+  IntentMandate,
+  SignedAP2Mandate,
+  VerifyAp2MandateOptions,
+} from './v2/payment-rails/index.js'

@@ -1,0 +1,48 @@
+{
+  "mandate": {
+    "vct": "mandate.checkout.open.1",
+    "constraints": [
+      {
+        "type": "checkout.allowed_merchants",
+        "allowed": [
+          {
+            "id": "merch:acme-001",
+            "name": "Acme Goods",
+            "url": "https://acme.example"
+          }
+        ]
+      },
+      {
+        "type": "checkout.line_items",
+        "items": [
+          {
+            "id": "req-001",
+            "acceptable_items": [
+              {
+                "id": "item-widget-001",
+                "name": "Widget",
+                "quantity": 1,
+                "unit_price": {
+                  "currency": "USD",
+                  "value": 4999
+                }
+              }
+            ],
+            "quantity": 1
+          }
+        ]
+      }
+    ],
+    "cnf": {
+      "jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "My6-jSfLcyOzpAHBwTtd1kvMwOEOzaHCtdEaA3eaheU"
+      }
+    },
+    "iat": 1777838400,
+    "exp": 1780516800
+  },
+  "signer_did": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5",
+  "signature": "436fb19b6d8be56970110e387bdb96e14a941f07a7beb2834c63d63d6a3ba31bb9ddfdd0639b76c36dc71ec46df6cf163879a265350e434bfadb6026f7070505"
+}
