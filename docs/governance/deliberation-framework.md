@@ -185,9 +185,9 @@ const packetV2 = submitEvidence({
   parentRef: packetV1.id,
   citations: [
     { source: 'doi:10.5281/zenodo.18749779', claim: 'narrowing invariant' },
-    { source: 'doi:10.5281/zenodo.19260073', claim: '15-dim constraint vector' },
+    { source: 'doi:10.5281/zenodo.19260073', claim: '14-dim constraint vector' },
   ],
-  body: 'Library A has narrowing AND a 15-dimensional constraint check.',
+  body: 'Library A has narrowing AND a 14-dimensional constraint check.',
   qualityScore: 0.85,
 })
 

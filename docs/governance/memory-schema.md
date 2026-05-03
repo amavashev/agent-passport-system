@@ -149,7 +149,7 @@ const evidence = submitEvidence({
   agentPrivateKey: researcher.privateKey,
   citations: [
     { source: 'doi:10.5281/zenodo.18749779', claim: 'monotonic narrowing invariant' },
-    { source: 'doi:10.5281/zenodo.19260073', claim: '15-dim constraint vector' },
+    { source: 'doi:10.5281/zenodo.19260073', claim: '14-dim constraint vector' },
   ],
   body: 'Library A enforces narrowing on every transfer. Library B does not.',
   qualityScore: 0.85,
