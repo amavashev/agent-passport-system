@@ -1,0 +1,30 @@
+{
+  "scenario_id": "SCN-008",
+  "description": "emitDenial produces a PaymentDenial with valid Ed25519 signature",
+  "kind": "emit_denial",
+  "input": {
+    "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rail_name": "nano",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "denial_reason": "no_commerce_scope",
+    "reason_detail": "scope 'commerce.purchase' not in delegation",
+    "issued_at": "2026-05-03T20:00:00.000Z"
+  },
+  "issuer_private_key_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected": {
+    "claim_type": "aps:payment_denial:v1",
+    "receipt_id": "ad838d878cacf7fb45f06f4d2ec6bda67b124783647ac86ec22f6c489fd52854",
+    "signer_did": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+    "issued_at": "2026-05-03T20:00:00.000Z",
+    "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rail_name": "nano",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "denial_reason": "no_commerce_scope",
+    "signature": "5741406530b86f6d10496816e601895fc26039692a26d216af43708b23d530bd5b02b00b5d87c15c224c07a064faac8f17b7e62a6bf3e804a804953f81945904",
+    "reason_detail": "scope 'commerce.purchase' not in delegation"
+  }
+}

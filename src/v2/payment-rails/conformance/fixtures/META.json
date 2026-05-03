@@ -1,0 +1,51 @@
+{
+  "generator": "src/v2/payment-rails/conformance/fixtures/_generate.ts",
+  "generated_at": "2026-05-03T20:31:52.974Z",
+  "schema_version": "1.0.0",
+  "signer_seed_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "signer_did_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+  "fixed_timestamp": "2026-05-03T20:00:00.000Z",
+  "scenarios": [
+    {
+      "id": "SCN-001",
+      "description": "preAuthorize accepts when delegation has commerce scope and amount within budget"
+    },
+    {
+      "id": "SCN-002",
+      "description": "preAuthorize rejects with 'no_commerce_scope' when required_scope absent from delegation"
+    },
+    {
+      "id": "SCN-003",
+      "description": "preAuthorize rejects with 'spend_limit_exceeded' when amount exceeds budget"
+    },
+    {
+      "id": "SCN-004",
+      "description": "preAuthorize rejects with 'wallet_revoked' when the bound wallet has been revoked"
+    },
+    {
+      "id": "SCN-005",
+      "description": "preAuthorize rejects with 'time_window_violation' after delegation.not_after has expired"
+    },
+    {
+      "id": "SCN-006",
+      "description": "emitReceipt produces a PaymentReceipt with a valid Ed25519 signature"
+    },
+    {
+      "id": "SCN-007",
+      "description": "emitReceipt output round-trips through JSON canonicalization and verifies clean"
+    },
+    {
+      "id": "SCN-008",
+      "description": "emitDenial produces a PaymentDenial with a valid Ed25519 signature"
+    },
+    {
+      "id": "SCN-009",
+      "description": "revokeWallet() halts subsequent preAuthorize calls bound to that wallet"
+    },
+    {
+      "id": "SCN-010",
+      "description": "emitted receipt.delegation_ref equals the input delegation receipt_id"
+    }
+  ],
+  "note": "Canonical inputs + expected outputs for the payment-rails conformance harness. Third-party adapters pin to schema_version and re-run the harness to claim conformance. Bump schema_version on any breaking shape change."
+}

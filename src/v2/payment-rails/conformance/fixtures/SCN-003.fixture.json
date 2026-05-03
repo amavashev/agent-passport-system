@@ -1,0 +1,24 @@
+{
+  "scenario_id": "SCN-003",
+  "description": "preAuthorize rejects with 'spend_limit_exceeded' when amount exceeds budget",
+  "kind": "pre_authorize",
+  "input": {
+    "delegation": {
+      "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "scope": [
+        "commerce.purchase"
+      ],
+      "spend_limit_base_units": "1000",
+      "wallet_id": "wallet-conformance-fixed",
+      "currency": "XNO"
+    },
+    "required_scope": "commerce.purchase",
+    "amount_base_units": "10000",
+    "currency": "XNO",
+    "now": "2026-05-03T20:00:00.000Z"
+  },
+  "expected": {
+    "ok": false,
+    "denial_reason": "spend_limit_exceeded"
+  }
+}

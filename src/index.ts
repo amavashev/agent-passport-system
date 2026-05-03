@@ -1482,9 +1482,17 @@ export {
   NanoPaymentRail,
   rawToXno,
   xnoToRaw,
+  // conformance harness
+  HARNESS_FIXED_NOW,
+  HARNESS_ISSUER_PRIV,
+  runConformance,
+  STANDARD_SCENARIOS,
 } from './v2/payment-rails/index.js'
 
 export type {
+  ConformanceContext,
+  ConformanceReport,
+  ConformanceScenario,
   CreateInvoiceOpts,
   DelegationView,
   DenialReason,
@@ -1507,6 +1515,9 @@ export type {
   PreAuthorizeResult,
   ReceiptVerifyReason,
   ReceiptVerifyResult,
+  RunConformanceOpts,
+  ScenarioOutcome,
+  ScenarioReport,
   SendPaymentOpts,
   VerifyTransactionResult,
 } from './v2/payment-rails/index.js'

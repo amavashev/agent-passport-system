@@ -1,0 +1,25 @@
+{
+  "scenario_id": "SCN-005",
+  "description": "preAuthorize rejects with 'time_window_violation' after delegation.not_after expired",
+  "kind": "pre_authorize",
+  "input": {
+    "delegation": {
+      "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "scope": [
+        "commerce.purchase"
+      ],
+      "spend_limit_base_units": "1000000000000000000000000000000",
+      "wallet_id": "wallet-conformance-fixed",
+      "currency": "XNO",
+      "not_after": "2026-05-03T19:59:00.000Z"
+    },
+    "required_scope": "commerce.purchase",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "now": "2026-05-03T20:00:00.000Z"
+  },
+  "expected": {
+    "ok": false,
+    "denial_reason": "time_window_violation"
+  }
+}
