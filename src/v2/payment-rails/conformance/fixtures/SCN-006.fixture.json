@@ -1,0 +1,30 @@
+{
+  "scenario_id": "SCN-006",
+  "description": "emitReceipt produces a PaymentReceipt with valid Ed25519 signature",
+  "kind": "emit_receipt",
+  "input": {
+    "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rail_name": "nano",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "tx_proof": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "invoice_id": "inv-conformance-006",
+    "issued_at": "2026-05-03T20:00:00.000Z"
+  },
+  "issuer_private_key_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected": {
+    "claim_type": "aps:payment_receipt:v1",
+    "receipt_id": "402b2624c185058c582d7b1ff970394a9b829472bff67f6b528311d6ba413cef",
+    "signer_did": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+    "issued_at": "2026-05-03T20:00:00.000Z",
+    "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rail_name": "nano",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "tx_proof": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "signature": "6f3e0160c9ff914c0e1d13904fa883dc9f25b5c615a3e09a9581e83d16d7870a7b26d09f93665da6ab95677d24558d93209449dce0504e0f8465be518507d406",
+    "invoice_id": "inv-conformance-006"
+  }
+}

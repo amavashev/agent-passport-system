@@ -68,3 +68,24 @@ export type {
   NanoHistoryEntry,
   NanoRailConfig,
 } from './nano.js'
+
+// ── Conformance harness ───────────────────────────────────────────
+// Standard scenarios any third-party PaymentRail adapter can run to
+// claim conformance to the APS governance contract. See
+// docs/governance/payment-rail-conformance.md for the full guide.
+
+export {
+  HARNESS_FIXED_NOW,
+  HARNESS_ISSUER_PRIV,
+  runConformance,
+  STANDARD_SCENARIOS,
+} from './conformance/index.js'
+
+export type {
+  ConformanceContext,
+  ConformanceReport,
+  ConformanceScenario,
+  RunConformanceOpts,
+  ScenarioOutcome,
+  ScenarioReport,
+} from './conformance/index.js'

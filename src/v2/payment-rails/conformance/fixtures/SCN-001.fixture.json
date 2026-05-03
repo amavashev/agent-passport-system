@@ -1,0 +1,23 @@
+{
+  "scenario_id": "SCN-001",
+  "description": "preAuthorize accepts when delegation has commerce scope and amount within budget",
+  "kind": "pre_authorize",
+  "input": {
+    "delegation": {
+      "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "scope": [
+        "commerce.purchase"
+      ],
+      "spend_limit_base_units": "1000000000000000000000000000000",
+      "wallet_id": "wallet-conformance-fixed",
+      "currency": "XNO"
+    },
+    "required_scope": "commerce.purchase",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "now": "2026-05-03T20:00:00.000Z"
+  },
+  "expected": {
+    "ok": true
+  }
+}
