@@ -177,11 +177,11 @@ Grade travels with the passport. Any consumer reads it without understanding sco
 - **Enforcement and accountability layer** — bring your own identity, gateway does the rest
 - **SDK `/core` subpath**: 24 curated functions for 90% of integrations
 - **MCP `essential` profile**: 20 tools by default (identity, delegation, enforcement, commerce, reputation)
-- **Policy eval <2ms**, 403 ops/sec, 15 constraint dimensions
-- **2,536 tests** including 50 adversarial attack scenarios
+- **Policy eval <2ms**, 403 ops/sec, 14 constraint dimensions
+- **2,586 tests** including 50 adversarial attack scenarios
 - **Zero heavy dependencies** — Node.js crypto + uuid only
 - **Apache-2.0** license
-- *Full surface area: 124 modules, 150 MCP tools — available under `APS_PROFILE=full` and the root `agent-passport-system` import.*
+- *Full surface area: 127 modules, 150 MCP tools — available under `APS_PROFILE=full` and the root `agent-passport-system` import.*
 
 ## Links
 
