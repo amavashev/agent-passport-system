@@ -1,0 +1,14 @@
+{
+  "claim_type": "aps:payment_denial:v1",
+  "receipt_id": "1f44ccff03ad4e687ee069382f7f1236acd5dd9953acf460ced8a8e2ee5787c0",
+  "signer_did": "c853ad0f0cd2b619aea92ceec4fd56a24d6499d584ce79257e45cfd8139b60a7",
+  "issued_at": "2026-05-03T20:00:00.000Z",
+  "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "rail_name": "nano",
+  "amount_base_units": "1000000000000000000000000000",
+  "currency": "XNO",
+  "denial_reason": "no_commerce_scope",
+  "signature": "3d6f9671746d449d6c87b21b8e1a7e9d269fff94efdbf74225b171c9ff4705fb4da3fde36e8d383341745e027a5d6929c73314311dfcc01f01413d600e343b04",
+  "reason_detail": "scope 'commerce.purchase' not in delegation"
+}

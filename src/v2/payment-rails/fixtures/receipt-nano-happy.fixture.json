@@ -1,0 +1,14 @@
+{
+  "claim_type": "aps:payment_receipt:v1",
+  "receipt_id": "1f0e401f3c7817ae76afa5c72da96f539f69cc27ff1f24c52bb2d41bfad0aad7",
+  "signer_did": "c853ad0f0cd2b619aea92ceec4fd56a24d6499d584ce79257e45cfd8139b60a7",
+  "issued_at": "2026-05-03T20:00:00.000Z",
+  "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "rail_name": "nano",
+  "amount_base_units": "1000000000000000000000000000",
+  "currency": "XNO",
+  "tx_proof": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "signature": "a83659f33a2486a4f2c167a4b7642ff0f3e2177a34ff850b6011b3cd982a361603605420b5198606a9d8e9199e69d8cc09932b249aaf5e37f91ff37ac20dc40c",
+  "invoice_id": "inv-fixture-001"
+}

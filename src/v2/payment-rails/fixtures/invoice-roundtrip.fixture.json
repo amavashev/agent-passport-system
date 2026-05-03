@@ -1,0 +1,18 @@
+{
+  "invoice_id": "inv-fixture-001",
+  "rail_name": "nano",
+  "amount_base_units": "1000000000000000000000005000",
+  "amount_human": "0.001000000000000000000000005 XNO",
+  "currency": "XNO",
+  "destination": "nano_3test1f1xt7r3y6a7z9k1c0nv8d4yhfk93rcd6b1pmce8wkqf6kpunkfxnwd",
+  "status": "pending",
+  "created_at": "2026-05-03T20:00:00.000Z",
+  "expires_at": "2026-05-03T21:00:00.000Z",
+  "metadata": {
+    "amount_raw": "1000000000000000000000005000",
+    "amount_xno_human": "0.001000000000000000000000005",
+    "settlement_id": "set-fixture-001",
+    "agent_id": "agent-fixture-001"
+  },
+  "memo": "unit test invoice"
+}

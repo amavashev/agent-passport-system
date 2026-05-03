@@ -1455,3 +1455,58 @@ export type {
   InstructionFile,
   InstructionProvenanceReceipt,
 } from './v2/instruction-provenance/index.js'
+
+// ── v2.6.x payment-rails — public PaymentRail interface, signed
+//      PaymentReceipt + PaymentDenial primitives, composable
+//      governance hooks (preAuthorize, emitReceipt, emitDenial),
+//      Nano reference adapter. Custodial wallet + credential
+//      storage stay gateway-private.
+export {
+  // hooks
+  createDefaultGovernanceHooks,
+  emitDenial,
+  emitReceipt,
+  preAuthorize,
+  verifyPaymentDenial,
+  verifyPaymentReceipt,
+  // canonicalize
+  canonicalizeDenialForId,
+  canonicalizeDenialForSig,
+  canonicalizeInvoice,
+  canonicalizeReceiptForId,
+  canonicalizeReceiptForSig,
+  invoiceDigest,
+  paymentRailsSha256Hex,
+  // nano reference adapter
+  createNanoRail,
+  NanoPaymentRail,
+  rawToXno,
+  xnoToRaw,
+} from './v2/payment-rails/index.js'
+
+export type {
+  CreateInvoiceOpts,
+  DelegationView,
+  DenialReason,
+  DenialVerifyReason,
+  DenialVerifyResult,
+  EmitDenialInput,
+  EmitReceiptInput,
+  FetchBlockInfo,
+  FetchHistory,
+  GovernanceHooks,
+  InvoiceStatus,
+  NanoBlockInfo,
+  NanoHistoryEntry,
+  NanoRailConfig,
+  PaymentDenial,
+  PaymentInvoice,
+  PaymentRail,
+  PaymentReceipt,
+  PreAuthorizeInput,
+  PreAuthorizeResult,
+  ReceiptVerifyReason,
+  ReceiptVerifyResult,
+  SendPaymentOpts,
+  VerifyTransactionResult,
+} from './v2/payment-rails/index.js'

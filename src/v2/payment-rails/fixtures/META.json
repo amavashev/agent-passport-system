@@ -1,0 +1,8 @@
+{
+  "generator": "src/v2/payment-rails/fixtures/_generate.ts",
+  "generated_at": "2026-05-03T20:19:52.390Z",
+  "signer_seed_hex": "7777777777777777777777777777777777777777777777777777777777777777",
+  "signer_did_hex": "c853ad0f0cd2b619aea92ceec4fd56a24d6499d584ce79257e45cfd8139b60a7",
+  "fixed_timestamp": "2026-05-03T20:00:00.000Z",
+  "note": "Byte-parity fixtures for payment-rails. Regenerate when receipt/denial/invoice shape changes."
+}
