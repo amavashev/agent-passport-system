@@ -1628,3 +1628,44 @@ export type {
   StripeSpendingLimitInterval,
   StripeVirtualCard,
 } from './v2/payment-rails/index.js'
+
+// ── v2.6.x payment-rails / MPP reference adapter (Stripe + Tempo + Visa) ──
+// Machine Payments Protocol draft-httpauth-payment-00 binding (March
+// 30 2026). Crosswalks APS V2Delegation to MPP method/currency/cap
+// permissions, maps APS denial reasons to MPP HTTP error envelopes
+// (402/403/410/503 + WWW-Authenticate error= token), and mints
+// signed MppApsReceipt / MppDenial primitives over RFC 8785 JCS
+// canonical bytes. Reference adapter does not transport — gateway
+// product handles live HTTP intercept and on-chain verification.
+export {
+  apsToMppHttpError,
+  delegationToMppAllowed,
+  MPP_VERSION,
+  preAuthorizeMppPayment,
+  signMppDenial,
+  signMppReceipt,
+  verifyMppDenial,
+  verifyMppReceipt,
+} from './v2/payment-rails/index.js'
+
+export type {
+  MppAllowedFromDelegation,
+  MppApsReceipt,
+  MppAuthorization,
+  MppDenial,
+  MppDenialReason,
+  MppMethod,
+  MppMethodCard,
+  MppMethodLightning,
+  MppMethodTempo,
+  MppMethodType,
+  MppPaymentChallenge,
+  MppPaymentReceipt,
+  MppPreAuthorizeResult,
+  MppVerifyReason,
+  MppVerifyResult,
+  PreAuthorizeMppOptions,
+  SignMppDenialInput,
+  SignMppReceiptInput,
+  VerifyMppOptions,
+} from './v2/payment-rails/index.js'
