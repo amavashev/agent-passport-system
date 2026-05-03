@@ -1,0 +1,30 @@
+{
+  "mandate": {
+    "vct": "mandate.payment.1",
+    "transaction_id": "tx-fixture-003",
+    "payee": {
+      "id": "merch:store-002",
+      "name": "Specific Store"
+    },
+    "payment_amount": {
+      "currency": "USD",
+      "value": 27999
+    },
+    "payment_instrument": {
+      "type": "card",
+      "id": "pi:card-1234",
+      "display": "**** **** **** 1234"
+    },
+    "cnf": {
+      "jwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "My6-jSfLcyOzpAHBwTtd1kvMwOEOzaHCtdEaA3eaheU"
+      }
+    },
+    "iat": 1777838400,
+    "exp": 1780516800
+  },
+  "signer_did": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5",
+  "signature": "5f24b9bc6273e9afd92d1e007eb548ee110dab19d677c3a907c1e336798020bb6d6bdda53c08711acd85fbff5d63de3ef46474f12d11c3ffa38fba3d4ef27704"
+}

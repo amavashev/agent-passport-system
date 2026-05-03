@@ -68,3 +68,59 @@ export type {
   NanoHistoryEntry,
   NanoRailConfig,
 } from './nano.js'
+
+// ── AP2 v0.2 interop adapter (Google Agent Payments Protocol) ────
+// Pinned to AP2 v0.2 (April 2026). Maps APS V2Delegation to AP2
+// mandate dicts (CheckoutMandate / OpenCheckoutMandate / PaymentMandate
+// / OpenPaymentMandate) and back.
+
+export {
+  AP2_VERSION,
+  ap2MandateToApsDelegation,
+  apsToAp2CartMandate,
+  apsToAp2IntentMandate,
+  apsToAp2OpenPaymentMandate,
+  apsToAp2PaymentMandate,
+  signAp2Mandate,
+  verifyAp2Mandate,
+} from './ap2/index.js'
+
+export type {
+  AP2AllowedMerchantsConstraint,
+  AP2AllowedPayeesConstraint,
+  AP2AllowedPaymentInstrumentsConstraint,
+  AP2Amount,
+  AP2AmountRangeConstraint,
+  AP2BudgetConstraint,
+  AP2CheckoutConstraint,
+  AP2CheckoutMandate,
+  AP2Cnf,
+  AP2Item,
+  AP2LineItemRequirement,
+  AP2LineItemsConstraint,
+  AP2Mandate,
+  AP2Merchant,
+  AP2OpenCheckoutMandate,
+  AP2OpenPaymentMandate,
+  AP2PaymentConstraint,
+  AP2PaymentInstrument,
+  AP2PaymentMandate,
+  AP2PaymentReferenceConstraint,
+  AP2Pisp,
+  AP2VctCheckout,
+  AP2VctOpenCheckout,
+  AP2VctOpenPayment,
+  AP2VctPayment,
+  Ap2VerifyReason,
+  Ap2VerifyResult,
+  Ap2ToApsOptions,
+  ApsToAp2CartOptions,
+  ApsToAp2IntentOptions,
+  ApsToAp2OpenPaymentOptions,
+  ApsToAp2PaymentOptions,
+  CartDetails,
+  CartMandate,
+  IntentMandate,
+  SignedAP2Mandate,
+  VerifyAp2MandateOptions,
+} from './ap2/index.js'
