@@ -1510,3 +1510,35 @@ export type {
   SendPaymentOpts,
   VerifyTransactionResult,
 } from './v2/payment-rails/index.js'
+
+// ── v2.6.x payment-rails / x402 reference adapter (Base + USDC) ──
+// Settles via the x402 v1 protocol against a caller-supplied
+// facilitator (Coinbase CDP public endpoint by default). Mocked
+// facilitator in tests; on-chain settlement happens via
+// EIP-3009 transferWithAuthorization at the facilitator.
+export {
+  createX402Rail,
+  USDC_BASE_MAINNET,
+  USDC_BASE_SEPOLIA,
+  X402_DEFAULT_FACILITATOR_URL,
+  X402_VERSION,
+  X402PaymentRail,
+} from './v2/payment-rails/index.js'
+
+export type {
+  EIP3009Authorization,
+  X402ExactSchemePayload,
+  X402FacilitatorSettle,
+  X402FacilitatorVerify,
+  X402Network,
+  X402PaymentPayload,
+  X402PaymentRequirements,
+  X402PaymentRequirementsResponse,
+  X402RailConfig,
+  X402Scheme,
+  X402SettleRequest,
+  X402SettleResponse,
+  X402SubmitOutcome,
+  X402VerifyRequest,
+  X402VerifyResponse,
+} from './v2/payment-rails/index.js'

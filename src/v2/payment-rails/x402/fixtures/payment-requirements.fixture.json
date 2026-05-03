@@ -1,0 +1,14 @@
+{
+  "scheme": "exact",
+  "network": "base",
+  "maxAmountRequired": "1000000",
+  "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "payTo": "0x000000000000000000000000000000000000beef",
+  "resource": "https://example.com/api/premium-data",
+  "description": "Premium API endpoint — 1 request",
+  "maxTimeoutSeconds": 60,
+  "extra": {
+    "name": "USD Coin",
+    "version": "2"
+  }
+}
