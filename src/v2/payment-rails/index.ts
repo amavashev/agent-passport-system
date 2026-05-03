@@ -12,6 +12,11 @@
 // the private gateway.
 // ══════════════════════════════════════════════════════════════════
 
+// ── Foundation: canonical V2Delegation scope resolution ──────────
+// Single source of truth for spend-cap field-name resolution across
+// every binding adapter. Direct per-rail field reads are forbidden.
+export { resolveSpendLimitCents } from './scope-resolution.js'
+
 export type {
   CreateInvoiceOpts,
   DelegationView,

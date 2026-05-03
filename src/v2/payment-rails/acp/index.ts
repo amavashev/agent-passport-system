@@ -29,6 +29,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
 import type { V2Delegation } from '../../types.js'
+import { resolveSpendLimitCents } from '../scope-resolution.js'
 import {
   ACP_API_VERSION,
 } from './types.js'
@@ -125,35 +126,21 @@ export interface AcpAllowedFromDelegation {
  * Used by preAuthorizeAcpCheckout and by callers that want to render
  * a delegation as a buyer-facing summary before initiating a session.
  *
- * Field sourcing (matches Stripe-Issuing and AP2 conventions):
- *   - max_total ← scope.resource_limits.spend_limit_cents (preferred,
- *     number-typed) OR scope.resource_limits['commerce.spend_limit']
- *     OR scope.constraints.spend_limit_cents (string fallback, parsed)
+ * Field sourcing (matches AP2 / MPP / Stripe-Issuing conventions):
+ *   - max_total ← resolveSpendLimitCents(delegation)
+ *     [walks resource_limits.spend_limit_cents → commerce.spend_limit
+ *     alias → constraints.spend_limit_cents string]
  *   - allowed_merchants ← scope.constraints.allowed_merchants (CSV)
  *   - allowed_currencies ← scope.constraints.allowed_currencies (CSV)
  *   - valid_until ← policy_context.valid_until
  */
 export function delegationToAcpAllowed(delegation: V2Delegation): AcpAllowedFromDelegation {
-  const limits = delegation.scope?.resource_limits ?? {}
   const constraints = delegation.scope?.constraints ?? {}
-
-  let maxTotal: number | null = null
-  if (typeof limits.spend_limit_cents === 'number' && Number.isFinite(limits.spend_limit_cents)) {
-    maxTotal = limits.spend_limit_cents
-  } else if (
-    typeof limits['commerce.spend_limit'] === 'number' &&
-    Number.isFinite(limits['commerce.spend_limit'])
-  ) {
-    maxTotal = limits['commerce.spend_limit']
-  } else if (constraints.spend_limit_cents) {
-    const parsed = Number(constraints.spend_limit_cents)
-    if (Number.isFinite(parsed) && parsed >= 0) maxTotal = parsed
-  }
 
   return {
     allowed_merchants: csvToList(constraints.allowed_merchants),
     allowed_currencies: csvToList(constraints.allowed_currencies).map((s) => s.toLowerCase()),
-    max_total: maxTotal,
+    max_total: resolveSpendLimitCents(delegation),
     valid_until: delegation.policy_context?.valid_until,
   }
 }

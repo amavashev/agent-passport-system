@@ -33,6 +33,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { sha256Hex } from '../canonicalize.js'
 import { emitDenial, emitReceipt, preAuthorize } from '../hooks.js'
+import { resolveSpendLimitCents } from '../scope-resolution.js'
 import type {
   CreateInvoiceOpts,
   DelegationView,
@@ -63,7 +64,9 @@ const RAIL_NAME = 'stripe-issuing'
 
 /**
  * Reads:
- *   - resource_limits.spend_limit_cents      → spending_limits[0].amount
+ *   - spend cap via resolveSpendLimitCents() — walks
+ *     resource_limits.spend_limit_cents → resource_limits['commerce.spend_limit']
+ *     AP2 alias → constraints.spend_limit_cents string fallback
  *   - constraints.allowed_merchant_categories (CSV) → allowed_categories
  *   - constraints.allowed_merchant_countries (CSV)  → allowed_merchant_countries
  *
@@ -74,17 +77,12 @@ const RAIL_NAME = 'stripe-issuing'
 export function defaultMapDelegationToSpendingControls(
   delegation: V2Delegation,
 ): SpendingControls {
-  const limits = delegation.scope.resource_limits ?? {}
   const constraints = delegation.scope.constraints ?? {}
 
-  const limitFromResource = limits.spend_limit_cents
-  const limitFromConstraint = constraints.spend_limit_cents
-    ? Number(constraints.spend_limit_cents)
-    : undefined
-  const limit = limitFromResource ?? limitFromConstraint
-  if (typeof limit !== 'number' || !Number.isFinite(limit) || limit <= 0) {
+  const limit = resolveSpendLimitCents(delegation)
+  if (limit === null || limit <= 0) {
     throw new Error(
-      'StripeIssuingRail: delegation.scope.resource_limits.spend_limit_cents must be a positive number',
+      'StripeIssuingRail: delegation must define a positive spend cap (resource_limits.spend_limit_cents, commerce.spend_limit, or constraints.spend_limit_cents)',
     )
   }
 
@@ -113,13 +111,10 @@ function delegationToView(
   apsCurrency: string,
   walletId: string,
 ): DelegationView {
-  const limits = delegation.scope.resource_limits ?? {}
-  const constraints = delegation.scope.constraints ?? {}
-  const cents = limits.spend_limit_cents ??
-    (constraints.spend_limit_cents ? Number(constraints.spend_limit_cents) : NaN)
-  if (!Number.isFinite(cents) || cents <= 0) {
+  const cents = resolveSpendLimitCents(delegation)
+  if (cents === null || cents <= 0) {
     throw new Error(
-      'delegationToView: delegation must declare spend_limit_cents > 0',
+      'delegationToView: delegation must declare a positive spend cap (resource_limits.spend_limit_cents, commerce.spend_limit, or constraints.spend_limit_cents)',
     )
   }
   const view: DelegationView = {

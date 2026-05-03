@@ -30,6 +30,7 @@ import { randomUUID } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
 import type { V2Delegation } from '../../types.js'
+import { resolveSpendLimitCents } from '../scope-resolution.js'
 import { MPP_VERSION } from './types.js'
 export { MPP_VERSION } from './types.js'
 import type {
@@ -123,34 +124,20 @@ export interface MppAllowedFromDelegation {
  * touches the resource.
  *
  * Field sourcing (matches AP2 / ACP / Stripe-Issuing conventions):
- *   - max_amount_per_charge ← scope.resource_limits.spend_limit_cents
- *     OR scope.resource_limits['payment.per_charge']
- *     OR Number(scope.constraints.spend_limit_cents)
+ *   - max_amount_per_charge ← resolveSpendLimitCents(delegation)
+ *     [walks resource_limits.spend_limit_cents → commerce.spend_limit
+ *     alias → constraints.spend_limit_cents string]
  *   - allowed_methods ← scope.constraints.allowed_payment_methods (CSV)
  *   - allowed_currencies ← scope.constraints.allowed_currencies (CSV)
  *   - valid_until ← policy_context.valid_until
  */
 export function delegationToMppAllowed(delegation: V2Delegation): MppAllowedFromDelegation {
-  const limits = delegation.scope?.resource_limits ?? {}
   const constraints = delegation.scope?.constraints ?? {}
-
-  let maxCharge: number | null = null
-  if (typeof limits.spend_limit_cents === 'number' && Number.isFinite(limits.spend_limit_cents)) {
-    maxCharge = limits.spend_limit_cents
-  } else if (
-    typeof limits['payment.per_charge'] === 'number' &&
-    Number.isFinite(limits['payment.per_charge'])
-  ) {
-    maxCharge = limits['payment.per_charge']
-  } else if (constraints.spend_limit_cents) {
-    const parsed = Number(constraints.spend_limit_cents)
-    if (Number.isFinite(parsed) && parsed >= 0) maxCharge = parsed
-  }
 
   return {
     allowed_methods: csvToList(constraints.allowed_payment_methods),
     allowed_currencies: csvToList(constraints.allowed_currencies).map((s) => s.toLowerCase()),
-    max_amount_per_charge: maxCharge,
+    max_amount_per_charge: resolveSpendLimitCents(delegation),
     valid_until: delegation.policy_context?.valid_until,
   }
 }

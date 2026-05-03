@@ -24,7 +24,8 @@
 import { createHash } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
-import type { V2Delegation, V2ScopeDefinition } from '../../types.js'
+import type { V2Delegation } from '../../types.js'
+import { resolveSpendLimitCents } from '../scope-resolution.js'
 import {
   AP2_VERSION,
 } from './types.js'
@@ -127,16 +128,22 @@ function _ed25519PubkeyHexFromCnf(cnf: AP2Cnf | undefined): string | undefined {
   }
 }
 
-/** Read APS spend limit from V2ScopeDefinition.resource_limits. The
- *  canonical key is `'commerce.spend_limit'`; callers can override
- *  via opts.spendLimitKey. Returns 0 when absent (caller may treat
- *  0 as "no spend permitted"). */
-function _spendLimitFromScope(
-  scope: V2ScopeDefinition,
+/** Read APS spend limit for AP2 mandate construction. Routes through
+ *  the foundation `resolveSpendLimitCents()` helper so AP2 honors
+ *  the same field-name resolution as ACP / MPP / Stripe-Issuing —
+ *  a delegation with `resource_limits.spend_limit_cents` works in
+ *  AP2 even though AP2's canonical key is `commerce.spend_limit`.
+ *
+ *  Canonical key for AP2 is `'commerce.spend_limit'` (callers can
+ *  override via opts.spendLimitKey). Returns 0 when no cap is found
+ *  (caller treats 0 as "no spend permitted") — this preserves the
+ *  AP2-specific 0-sentinel that `apsToAp2OpenPaymentMandate` relies on. */
+function _spendLimitFromDelegation(
+  delegation: V2Delegation,
   spendLimitKey = 'commerce.spend_limit',
 ): number {
-  const v = scope.resource_limits?.[spendLimitKey]
-  return typeof v === 'number' ? v : 0
+  const v = resolveSpendLimitCents(delegation, { canonicalKey: spendLimitKey })
+  return v ?? 0
 }
 
 /** Build a sha256 over canonical bytes, return base64url (the AP2
@@ -305,7 +312,7 @@ export function apsToAp2OpenPaymentMandate(
   delegation: V2Delegation,
   opts: ApsToAp2OpenPaymentOptions,
 ): AP2OpenPaymentMandate {
-  const spendLimit = _spendLimitFromScope(delegation.scope, opts.spend_limit_key)
+  const spendLimit = _spendLimitFromDelegation(delegation, opts.spend_limit_key)
   const constraints: AP2PaymentConstraint[] = [
     {
       type: 'payment.budget',
