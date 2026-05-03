@@ -1485,6 +1485,7 @@ export {
   // conformance harness
   HARNESS_FIXED_NOW,
   HARNESS_ISSUER_PRIV,
+  resolveSpendLimitCents,
   runConformance,
   STANDARD_SCENARIOS,
 } from './v2/payment-rails/index.js'

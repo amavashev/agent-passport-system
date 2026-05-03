@@ -124,10 +124,10 @@ test('delegationToMppAllowed — extracts cap from resource_limits.spend_limit_c
   assert.equal(allowed.max_amount_per_charge, 2500)
 })
 
-test('delegationToMppAllowed — extracts cap from resource_limits[payment.per_charge]', () => {
+test('delegationToMppAllowed — extracts cap from resource_limits[commerce.spend_limit] AP2 alias', () => {
   const d = paymentDelegation()
   delete (d.scope as { resource_limits?: Record<string, number> }).resource_limits
-  d.scope.resource_limits = { 'payment.per_charge': 8888 }
+  d.scope.resource_limits = { 'commerce.spend_limit': 8888 }
   const allowed = delegationToMppAllowed(d)
   assert.equal(allowed.max_amount_per_charge, 8888)
 })
