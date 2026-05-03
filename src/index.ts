@@ -1628,3 +1628,59 @@ export type {
   StripeSpendingLimitInterval,
   StripeVirtualCard,
 } from './v2/payment-rails/index.js'
+
+// ── v2.6.x payment-rails / ACP reference adapter (OpenAI + Stripe) ─
+// Agentic Commerce Protocol v2025-09-29 binding. Crosswalks APS
+// V2Delegation to ACP checkout-session permissions, maps APS denial
+// reasons to ACP error type/code envelopes, and mints signed
+// AcpReceipt / AcpDenial primitives over RFC 8785 JCS canonical bytes.
+// Reference adapter does not transport — gateway product.
+export {
+  ACP_API_VERSION,
+  acpSessionToDelegationHints,
+  apsToAcpError,
+  checkAcpSessionUnderBudget,
+  delegationToAcpAllowed,
+  preAuthorizeAcpCheckout,
+  signAcpDenial,
+  signAcpReceipt,
+  verifyAcpDenial,
+  verifyAcpReceipt,
+} from './v2/payment-rails/index.js'
+
+export type {
+  AcpAllowedFromDelegation,
+  AcpBuyer,
+  AcpCheckoutSession,
+  AcpCheckoutSessionStatus,
+  AcpCompleteCheckoutSessionRequest,
+  AcpCreateCheckoutSessionRequest,
+  AcpDenial,
+  AcpDenialReason,
+  AcpErrorCode,
+  AcpErrorResponse,
+  AcpErrorType,
+  AcpFulfillmentAddress,
+  AcpFulfillmentOption,
+  AcpHookConfig,
+  AcpItem,
+  AcpLineItem,
+  AcpMessage,
+  AcpMessageContentType,
+  AcpMessageType,
+  AcpOp,
+  AcpPaymentData,
+  AcpPaymentMethod,
+  AcpPaymentProvider,
+  AcpPaymentProviderName,
+  AcpPreAuthorizeResult,
+  AcpReceipt,
+  AcpTotal,
+  AcpTotalType,
+  AcpUpdateCheckoutSessionRequest,
+  AcpVerifyReason,
+  AcpVerifyResult,
+  SignAcpDenialInput,
+  SignAcpReceiptInput,
+  VerifyAcpReceiptOptions,
+} from './v2/payment-rails/index.js'

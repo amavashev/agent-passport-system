@@ -1,0 +1,301 @@
+// Copyright 2024-2026 Tymofii Pidlisnyi. Apache-2.0 license. See LICENSE.
+// ══════════════════════════════════════════════════════════════════
+// ACP — Agentic Commerce Protocol (OpenAI + Stripe), v2025-09-29
+// ══════════════════════════════════════════════════════════════════
+// ACP is an interaction model for connecting buyers, their AI agents,
+// and businesses to complete purchases over a stable REST API. The
+// merchant remains the system of record; orders, payments, taxes,
+// and compliance run on the merchant's existing commerce stack. ACP
+// defines the wire shape of the checkout-session lifecycle that an
+// agent platform (e.g. ChatGPT) calls into.
+//
+// This adapter binds APS V2 governance to ACP at the boundary where
+// an agent is about to call a merchant's checkout endpoint. APS
+// signs and verifies receipts over each checkout-session operation,
+// crosswalks V2Delegation to permitted operations, and maps APS
+// denial reasons to ACP error types/codes so the merchant sees a
+// well-formed ACP error response instead of a transport failure.
+//
+// SDK scope: type model + crosswalk + APS-signed receipts/denials
+// over canonicalized operation envelopes. Out of scope (gateway
+// product): live HTTP transport, webhook routing, multi-tenant
+// merchant onboarding, settlement, dispute orchestration.
+// ══════════════════════════════════════════════════════════════════
+
+/** ACP wire-version header. Date-versioned per the spec. */
+export const ACP_API_VERSION = '2025-09-29' as const
+
+// ── Core spec types ───────────────────────────────────────────────
+
+export type AcpCheckoutSessionStatus =
+  | 'not_ready_for_payment'
+  | 'ready_for_payment'
+  | 'in_progress'
+  | 'completed'
+  | 'canceled'
+
+export interface AcpItem {
+  /** Merchant-defined product/SKU id. */
+  id: string
+  quantity: number
+}
+
+export interface AcpLineItem {
+  /** ACP-assigned line-item id, distinct from item.id. */
+  id: string
+  item: AcpItem
+  /** All amounts are integers in minor units (e.g. cents). */
+  base_amount: number
+  discount: number
+  subtotal: number
+  tax: number
+  total: number
+}
+
+export interface AcpBuyer {
+  first_name: string
+  last_name: string
+  email: string
+}
+
+export interface AcpFulfillmentAddress {
+  name: string
+  line_one: string
+  line_two?: string
+  city: string
+  state: string
+  country: string
+  postal_code: string
+}
+
+export interface AcpFulfillmentOption {
+  type: 'shipping' | 'pickup' | 'digital'
+  id: string
+  title: string
+  subtitle?: string
+  carrier?: string
+  earliest_delivery_time?: string // ISO 8601
+  latest_delivery_time?: string // ISO 8601
+  subtotal: number
+  tax: number
+  total: number
+}
+
+/** Stripe is the first PSP; the field is open-string for future PSPs. */
+export type AcpPaymentProviderName = 'stripe' | (string & {})
+export type AcpPaymentMethod = 'card' | (string & {})
+
+export interface AcpPaymentProvider {
+  provider: AcpPaymentProviderName
+  supported_payment_methods: AcpPaymentMethod[]
+}
+
+/** Token-only — agents NEVER see raw card numbers. PSP mints the token. */
+export interface AcpPaymentData {
+  token: string
+  provider: AcpPaymentProviderName
+  billing_address?: AcpFulfillmentAddress
+}
+
+export type AcpTotalType =
+  | 'items_base_amount'
+  | 'subtotal'
+  | 'tax'
+  | 'discount'
+  | 'fulfillment'
+  | 'total'
+
+export interface AcpTotal {
+  type: AcpTotalType
+  display_text: string
+  amount: number
+}
+
+export type AcpMessageType = 'info' | 'error'
+export type AcpMessageContentType = 'plain' | 'markdown'
+
+/** Closed taxonomy from the agentic_checkout RFC. */
+export type AcpErrorCode =
+  | 'missing'
+  | 'invalid'
+  | 'out_of_stock'
+  | 'payment_declined'
+  | 'requires_sign_in'
+  | 'requires_3ds'
+
+export interface AcpMessage {
+  type: AcpMessageType
+  code?: AcpErrorCode
+  /** RFC 9535 JSONPath into the request body, when applicable. */
+  param?: string
+  content_type: AcpMessageContentType
+  content: string
+}
+
+export interface AcpCheckoutSession {
+  id: string
+  status: AcpCheckoutSessionStatus
+  /** ISO 4217 lowercase. */
+  currency: string
+  line_items: AcpLineItem[]
+  buyer?: AcpBuyer
+  fulfillment_address?: AcpFulfillmentAddress
+  fulfillment_options?: AcpFulfillmentOption[]
+  fulfillment_option_id?: string
+  payment_provider?: AcpPaymentProvider
+  totals: AcpTotal[]
+  messages?: AcpMessage[]
+  /** Metadata is opaque to ACP; we use it to carry APS receipt ids. */
+  metadata?: Record<string, string>
+}
+
+// ── Request shapes ────────────────────────────────────────────────
+
+export interface AcpCreateCheckoutSessionRequest {
+  items: AcpItem[]
+  buyer?: AcpBuyer
+  fulfillment_address?: AcpFulfillmentAddress
+}
+
+export interface AcpUpdateCheckoutSessionRequest {
+  items?: AcpItem[]
+  buyer?: AcpBuyer
+  fulfillment_address?: AcpFulfillmentAddress
+  fulfillment_option_id?: string
+}
+
+export interface AcpCompleteCheckoutSessionRequest {
+  payment_data: AcpPaymentData
+}
+
+// ── Error envelope ────────────────────────────────────────────────
+
+export type AcpErrorType =
+  | 'invalid_request'
+  | 'request_not_idempotent'
+  | 'processing_error'
+  | 'service_unavailable'
+
+export interface AcpErrorResponse {
+  type: AcpErrorType
+  code?: AcpErrorCode | string
+  message: string
+  /** RFC 9535 JSONPath. */
+  param?: string
+}
+
+// ── APS-bound envelopes ───────────────────────────────────────────
+
+/** Which checkout-session operation the receipt/denial covers. */
+export type AcpOp = 'create' | 'update' | 'complete' | 'cancel' | 'retrieve'
+
+/**
+ * AcpReceipt is the APS-signed proof that a particular checkout-session
+ * operation was authorized by a delegation and went out under that scope.
+ * The receipt binds the agent, the delegation, the requested operation,
+ * the canonical request body digest, and the resulting (or proposed)
+ * session state into a single signed object so any third party can
+ * later verify the merchant call was scope-bounded at the moment it
+ * happened.
+ */
+export interface AcpReceipt {
+  receipt_id: string
+  receipt_kind: 'acp.checkout_session_op'
+
+  /** Pinned to ACP_API_VERSION at receipt mint time. */
+  acp_version: typeof ACP_API_VERSION
+
+  op: AcpOp
+  session_id: string
+
+  /** APS V2Delegation id; required for non-trivial operations. */
+  delegation_ref?: string
+  agent_id: string
+  /** Hex Ed25519 public key of the signer (typically the agent). */
+  signer: string
+
+  /** Frozen state attached to this receipt — what the merchant returned. */
+  session_state: AcpCheckoutSession
+
+  /** sha256 hex of the canonicalized (JCS) request body. */
+  request_digest: string
+
+  /** ISO 8601 UTC with millisecond precision + Z. */
+  issued_at: string
+
+  /** Hex Ed25519 signature over the canonical receipt body, sig field cleared. */
+  signature: string
+}
+
+/** Reasons APS will refuse to allow an ACP operation. */
+export type AcpDenialReason =
+  | 'spend_limit_exceeded'
+  | 'merchant_not_allowed'
+  | 'delegation_expired'
+  | 'currency_mismatch'
+  | 'wallet_revoked'
+  | 'no_commerce_scope'
+  | 'idempotency_conflict'
+  | 'invalid_session_state'
+  | 'api_version_mismatch'
+
+export interface AcpDenial {
+  denial_id: string
+  denial_kind: 'acp.checkout_session_denial'
+
+  acp_version: typeof ACP_API_VERSION
+
+  op: AcpOp
+  session_id?: string
+
+  delegation_ref?: string
+  agent_id: string
+  signer: string
+
+  /** APS-side reason — the closed taxonomy above. */
+  reason: AcpDenialReason
+
+  /**
+   * Mapped ACP error code that the merchant would have surfaced. The
+   * mapping is deterministic and lives in apsToAcpError().
+   */
+  acp_error_code: AcpErrorCode
+  acp_error_type: AcpErrorType
+  /** JSONPath into the offending field of the original request, when known. */
+  acp_error_param?: string
+
+  /** sha256 hex of the canonicalized rejected request body. */
+  request_digest: string
+
+  issued_at: string
+  signature: string
+}
+
+// ── Verification result types ─────────────────────────────────────
+
+export type AcpVerifyReason =
+  | 'INVALID_API_VERSION'
+  | 'INVALID_RECEIPT_KIND'
+  | 'INVALID_OP'
+  | 'MISSING_REQUIRED_FIELD'
+  | 'SIGNATURE_INVALID'
+  | 'EXPIRED'
+
+export type AcpVerifyResult =
+  | { valid: true }
+  | { valid: false; reason: AcpVerifyReason; detail?: string }
+
+// ── Configuration for the ACP rail-side hook ──────────────────────
+
+/**
+ * Caller-tunable knobs for the APS gate. Defaults follow the AP2 and
+ * Stripe-Issuing adapter conventions: receipts expire 24h after
+ * issuance, signer-verification on by default, idempotency-key
+ * tracking optional and caller-provided.
+ */
+export interface AcpHookConfig {
+  /** Default 24h. Receipts older than this fail verification. */
+  receipt_ttl_seconds?: number
+  /** If true, emitted receipts include the buyer email; default false. */
+  include_buyer_in_metadata?: boolean
+}

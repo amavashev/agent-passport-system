@@ -208,3 +208,62 @@ export type {
   StripeIssuingConfig,
   VirtualCard as StripeVirtualCard,
 } from './stripe-issuing/index.js'
+
+// ── ACP reference adapter (Agentic Commerce Protocol — OpenAI + Stripe) ──
+// Implements APS governance over ACP v2025-09-29 checkout-session
+// operations (POST /checkout_sessions, update, complete, cancel,
+// retrieve). Crosswalks V2Delegation to permitted operations and
+// maps APS denial reasons to ACP error type/code envelopes so the
+// merchant sees a well-formed ACP error instead of a transport
+// failure. Reference adapter does not transport — gateway product.
+
+export {
+  ACP_API_VERSION,
+  acpSessionToDelegationHints,
+  apsToAcpError,
+  checkAcpSessionUnderBudget,
+  delegationToAcpAllowed,
+  preAuthorizeAcpCheckout,
+  signAcpDenial,
+  signAcpReceipt,
+  verifyAcpDenial,
+  verifyAcpReceipt,
+} from './acp/index.js'
+export type {
+  AcpAllowedFromDelegation,
+  AcpPreAuthorizeResult,
+  SignAcpDenialInput,
+  SignAcpReceiptInput,
+  VerifyAcpReceiptOptions,
+} from './acp/index.js'
+export type {
+  AcpBuyer,
+  AcpCheckoutSession,
+  AcpCheckoutSessionStatus,
+  AcpCompleteCheckoutSessionRequest,
+  AcpCreateCheckoutSessionRequest,
+  AcpDenial,
+  AcpDenialReason,
+  AcpErrorCode,
+  AcpErrorResponse,
+  AcpErrorType,
+  AcpFulfillmentAddress,
+  AcpFulfillmentOption,
+  AcpHookConfig,
+  AcpItem,
+  AcpLineItem,
+  AcpMessage,
+  AcpMessageContentType,
+  AcpMessageType,
+  AcpOp,
+  AcpPaymentData,
+  AcpPaymentMethod,
+  AcpPaymentProvider,
+  AcpPaymentProviderName,
+  AcpReceipt,
+  AcpTotal,
+  AcpTotalType,
+  AcpUpdateCheckoutSessionRequest,
+  AcpVerifyReason,
+  AcpVerifyResult,
+} from './acp/types.js'
