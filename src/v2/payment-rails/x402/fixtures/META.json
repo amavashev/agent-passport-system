@@ -1,0 +1,20 @@
+{
+  "generator": "src/v2/payment-rails/x402/fixtures/_generate.ts",
+  "generated_at": "2026-05-03T20:32:40.849Z",
+  "signer_seed_hex": "6666666666666666666666666666666666666666666666666666666666666666",
+  "signer_did_hex": "34b4d9043156cb6dcf0beb0a2949b7559c940d2bcb6dbe8c53a9b30278e3a746",
+  "fixed_timestamp": "2026-05-03T20:00:00.000Z",
+  "pinned": {
+    "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tx_hash": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "payer": "0x000000000000000000000000000000000000cafe",
+    "pay_to": "0x000000000000000000000000000000000000beef",
+    "usdc_base_mainnet": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  },
+  "rail_name": "x402-base-USDC",
+  "network": "base",
+  "scheme": "exact",
+  "x402_version": 1,
+  "note": "Byte-parity fixtures for the x402 reference adapter. Regenerate when the wire shapes (PaymentRequirements / PaymentPayload) or the signed APS receipt/denial canonical bytes change."
+}

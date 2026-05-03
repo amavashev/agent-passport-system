@@ -145,3 +145,38 @@ export type {
   ScenarioOutcome,
   ScenarioReport,
 } from './conformance/index.js'
+
+// ── x402 reference adapter (Base + USDC, Coinbase facilitator) ───
+// Implements PaymentRail over the x402 v1 protocol (coinbase/x402).
+// Settles USDC on Base (eip155:8453) via the EIP-3009 'exact' scheme
+// against a caller-supplied facilitator. The Coinbase CDP public
+// facilitator URL is exported as X402_DEFAULT_FACILITATOR_URL.
+
+export {
+  createX402Rail,
+  DEFAULT_FACILITATOR_URL as X402_DEFAULT_FACILITATOR_URL,
+  USDC_BASE_MAINNET,
+  USDC_BASE_SEPOLIA,
+  X402PaymentRail,
+} from './x402/index.js'
+export type {
+  FacilitatorSettle as X402FacilitatorSettle,
+  FacilitatorVerify as X402FacilitatorVerify,
+  X402RailConfig,
+} from './x402/index.js'
+
+export { X402_VERSION } from './x402/types.js'
+export type {
+  EIP3009Authorization,
+  X402ExactSchemePayload,
+  X402Network,
+  X402PaymentPayload,
+  X402PaymentRequirements,
+  X402PaymentRequirementsResponse,
+  X402Scheme,
+  X402SettleRequest,
+  X402SettleResponse,
+  X402SubmitOutcome,
+  X402VerifyRequest,
+  X402VerifyResponse,
+} from './x402/types.js'
