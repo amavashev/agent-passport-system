@@ -267,3 +267,46 @@ export type {
   AcpVerifyReason,
   AcpVerifyResult,
 } from './acp/types.js'
+
+// ── MPP reference adapter (Stripe + Tempo + Visa Machine Payments Protocol) ──
+// Implements APS governance over MPP draft-httpauth-payment-00 — an
+// HTTP authentication scheme for machine payments where servers
+// emit a 402 with WWW-Authenticate: Payment and clients retry with
+// Authorization: Payment carrying proof. Method-agnostic: tempo
+// stablecoins, Visa MPP card spec, Bitcoin Lightning all sit in a
+// discriminated union. Crosswalks V2Delegation to permitted methods
+// and maps APS denial reasons to HTTP 402/403/410/503 envelopes.
+
+export {
+  apsToMppHttpError,
+  delegationToMppAllowed,
+  MPP_VERSION,
+  preAuthorizeMppPayment,
+  signMppDenial,
+  signMppReceipt,
+  verifyMppDenial,
+  verifyMppReceipt,
+} from './mpp/index.js'
+export type {
+  MppAllowedFromDelegation,
+  MppPreAuthorizeResult,
+  PreAuthorizeMppOptions,
+  SignMppDenialInput,
+  SignMppReceiptInput,
+  VerifyMppOptions,
+} from './mpp/index.js'
+export type {
+  MppApsReceipt,
+  MppAuthorization,
+  MppDenial,
+  MppDenialReason,
+  MppMethod,
+  MppMethodCard,
+  MppMethodLightning,
+  MppMethodTempo,
+  MppMethodType,
+  MppPaymentChallenge,
+  MppPaymentReceipt,
+  MppVerifyReason,
+  MppVerifyResult,
+} from './mpp/types.js'
