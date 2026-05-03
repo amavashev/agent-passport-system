@@ -1,0 +1,240 @@
+// Copyright 2024-2026 Tymofii Pidlisnyi. Apache-2.0 license. See LICENSE.
+// ══════════════════════════════════════════════════════════════════
+// Payment Rails — public SDK contract
+// ══════════════════════════════════════════════════════════════════
+// Spec: every payment rail (Nano, Lightning, USDC, Stripe, etc.) MUST
+// implement this interface AND wire the GovernanceHooks before money
+// moves. The contract:
+//
+//   1. preAuthorize() runs before any state-changing rail call.
+//      Returns a PaymentReceipt skeleton (success path) or a
+//      PaymentDenial (fail path). No retry; no partial state.
+//
+//   2. On rail-side success, emit a fully-signed PaymentReceipt that
+//      binds (rail_name, action_ref, delegation_ref, amount, currency,
+//      tx_proof) to an Ed25519 signature.
+//
+//   3. On rail-side failure, emit a fully-signed PaymentDenial citing
+//      one of the closed-taxonomy denial_reason values.
+//
+//   4. revokeRail(walletId) MUST stop subsequent operations bound to
+//      the named wallet. Cascade revocation lives outside this SDK
+//      (gateway product), but the rail interface guarantees the cut.
+//
+// The gateway runtime composes these rails with credential storage,
+// wallet derivation, and routing. Those stay private. This SDK ships
+// the canonical signed-receipt format so audits replay across rails.
+// ══════════════════════════════════════════════════════════════════
+
+// ── Closed taxonomies ──────────────────────────────────────────────
+
+export type InvoiceStatus = 'pending' | 'confirmed' | 'expired' | 'failed'
+
+export type DenialReason =
+  | 'no_commerce_scope'
+  | 'spend_limit_exceeded'
+  | 'wallet_revoked'
+  | 'time_window_violation'
+  | 'rail_error'
+
+// ── Core data shapes ───────────────────────────────────────────────
+
+export interface PaymentInvoice {
+  invoice_id: string
+  rail_name: string
+  /** Smallest currency unit as a string (raw for Nano, satoshis for LN,
+   *  cents for fiat). String form avoids JS number precision loss for
+   *  values above 2^53. */
+  amount_base_units: string
+  /** Human-readable form for display: "0.001 XNO", "4200 sats", "$3.14". */
+  amount_human: string
+  currency: string
+  destination: string
+  memo?: string
+  status: InvoiceStatus
+  created_at: string
+  expires_at?: string
+  /** Optional opaque metadata. Rails may include rail-specific data
+   *  (e.g. expected raw amount for the Nano amount-uniqueness pattern). */
+  metadata?: Record<string, unknown>
+}
+
+export interface PaymentReceipt {
+  /** Always 'aps:payment_receipt:v1'. */
+  claim_type: string
+  /** sha256 hex of canonical(receipt without signature). Content-addressed. */
+  receipt_id: string
+  /** Ed25519 hex pubkey of the signer (the rail issuer or the gateway). */
+  signer_did: string
+  /** ISO 8601 UTC ms + Z. */
+  issued_at: string
+  /** Receipt_id of the delegation that authorized this spend. */
+  delegation_ref: string
+  /** action_ref (Module 37 / A2A#1672 hex sha256) that the payment
+   *  is bound to. Audit anchor across rails and APS evaluations. */
+  action_ref: string
+  /** Rail identifier ('nano', 'lightning', 'usdc-base', ...). */
+  rail_name: string
+  /** Smallest currency unit as a string. */
+  amount_base_units: string
+  currency: string
+  /** Rail-specific transaction proof: block hash (Nano), txid (LN),
+   *  charge_id (Stripe), tx hash (EVM). Opaque to APS. */
+  tx_proof: string
+  /** Optional invoice_id this receipt settles. */
+  invoice_id?: string
+  /** Ed25519 signature over canonical(receipt with signature emptied), hex. */
+  signature: string
+}
+
+export interface PaymentDenial {
+  /** Always 'aps:payment_denial:v1'. */
+  claim_type: string
+  /** sha256 hex of canonical(denial without signature). */
+  receipt_id: string
+  /** Ed25519 hex pubkey of the issuer. */
+  signer_did: string
+  /** ISO 8601 UTC ms + Z. */
+  issued_at: string
+  delegation_ref: string
+  action_ref: string
+  rail_name: string
+  /** Attempted amount, for audit even when denied. */
+  amount_base_units: string
+  currency: string
+  denial_reason: DenialReason
+  /** Optional human-readable detail. Closed taxonomy stays in
+   *  denial_reason; this field carries context like "scope 'commerce.refund'
+   *  not in delegation". */
+  reason_detail?: string
+  signature: string
+}
+
+// ── PaymentRail interface ─────────────────────────────────────────
+
+export interface CreateInvoiceOpts {
+  /** Smallest currency unit as a string. Rails accept numeric inputs at
+   *  the adapter boundary and convert to base-unit strings here. */
+  amount_base_units: string
+  settlement_id?: string
+  agent_id?: string
+  memo?: string
+  expires_in_seconds?: number
+}
+
+export interface SendPaymentOpts {
+  destination: string
+  amount_base_units: string
+  memo?: string
+}
+
+export interface VerifyTransactionResult {
+  verified: boolean
+  amount_base_units: string
+  sender?: string
+  receiver?: string
+  timestamp?: string
+  error?: string
+}
+
+export interface PaymentRail {
+  readonly name: string
+  readonly currency: string
+
+  /** Build a payment request. Rails may add a uniqueness fingerprint
+   *  (Nano amount offset, LN payment hash, etc.) inside the returned
+   *  invoice; APS does not constrain how. */
+  createInvoice(opts: CreateInvoiceOpts): Promise<PaymentInvoice>
+
+  /** Read-only check of invoice state. MUST NOT change anything. */
+  checkStatus(invoiceId: string): Promise<PaymentInvoice>
+
+  /** Verify a settled tx is real and matches expected amount. Rails
+   *  consult their on-chain or processor API. */
+  verifyTransaction(
+    txProof: string,
+    expectedAmountBaseUnits?: string,
+  ): Promise<VerifyTransactionResult>
+
+  /** Stop operations bound to walletId. Idempotent; calling on an
+   *  already-revoked wallet returns true without error. Cascade
+   *  revocation across rails is the gateway's job. */
+  revokeWallet(walletId: string): Promise<boolean>
+
+  /** Returns true if the named wallet is revoked. */
+  isWalletRevoked(walletId: string): boolean
+}
+
+// ── Pre-authorization input + result ──────────────────────────────
+
+export interface DelegationView {
+  /** Receipt_id of the delegation. */
+  receipt_id: string
+  /** Granted scopes, e.g. ['commerce.purchase', 'commerce.refund']. */
+  scope: string[]
+  /** Spend limit in the rail's smallest currency unit, as a string. */
+  spend_limit_base_units: string
+  /** Optional UTC ms timestamps bracketing when this delegation is
+   *  permitted to authorize spending. */
+  not_before?: string
+  not_after?: string
+  /** Wallet identifier this delegation is bound to. Rails consult
+   *  isWalletRevoked(wallet_id) before authorizing. */
+  wallet_id: string
+  /** Currency the spend_limit is expressed in. Must match the rail's
+   *  currency at preAuthorize time. */
+  currency: string
+}
+
+export interface PreAuthorizeInput {
+  delegation: DelegationView
+  required_scope: string
+  amount_base_units: string
+  currency: string
+  /** Caller-provided clock for testing; defaults to Date.now() in
+   *  preAuthorize when omitted. */
+  now?: Date
+}
+
+export type PreAuthorizeResult =
+  | { ok: true }
+  | { ok: false; denial_reason: DenialReason; reason_detail?: string }
+
+// ── GovernanceHooks ───────────────────────────────────────────────
+
+export interface EmitReceiptInput {
+  delegation_ref: string
+  action_ref: string
+  rail_name: string
+  amount_base_units: string
+  currency: string
+  tx_proof: string
+  invoice_id?: string
+  /** Optional override; defaults to new Date().toISOString(). */
+  issued_at?: string
+}
+
+export interface EmitDenialInput {
+  delegation_ref: string
+  action_ref: string
+  rail_name: string
+  amount_base_units: string
+  currency: string
+  denial_reason: DenialReason
+  reason_detail?: string
+  /** Optional override; defaults to new Date().toISOString(). */
+  issued_at?: string
+}
+
+export interface GovernanceHooks {
+  /** MUST be called before any state-changing rail operation. */
+  preAuthorize(input: PreAuthorizeInput, rail: PaymentRail): PreAuthorizeResult
+
+  /** Emits a signed PaymentReceipt. Caller provides the issuer's
+   *  Ed25519 private key (hex). The signer_did is derived from it. */
+  emitReceipt(input: EmitReceiptInput, issuerPrivateKeyHex: string): PaymentReceipt
+
+  /** Emits a signed PaymentDenial. Caller provides the issuer's
+   *  Ed25519 private key (hex). */
+  emitDenial(input: EmitDenialInput, issuerPrivateKeyHex: string): PaymentDenial
+}

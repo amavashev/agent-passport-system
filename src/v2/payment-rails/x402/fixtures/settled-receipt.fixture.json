@@ -1,0 +1,14 @@
+{
+  "claim_type": "aps:payment_receipt:v1",
+  "receipt_id": "2b412c638a1dca2a63aa630c6d42a25ca0a6e02311d80a0d74e5324d16365a5d",
+  "signer_did": "34b4d9043156cb6dcf0beb0a2949b7559c940d2bcb6dbe8c53a9b30278e3a746",
+  "issued_at": "2026-05-03T20:00:00.000Z",
+  "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "rail_name": "x402-base-USDC",
+  "amount_base_units": "1000000",
+  "currency": "USDC",
+  "tx_proof": "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "signature": "316b6fe643fde084abcf906f8b761c1263f8ee314076202633eed7f937fa8ab115d1f6faa29026bcadaab6ae142b2a813463efd3073eccfff0c8658f92a58d02",
+  "invoice_id": "inv-x402-fixture-001"
+}

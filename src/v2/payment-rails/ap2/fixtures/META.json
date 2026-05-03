@@ -1,0 +1,37 @@
+{
+  "generator": "src/v2/payment-rails/ap2/fixtures/_generate.ts",
+  "ap2_version": "0.2",
+  "generated_at": "2026-05-03T20:33:08.409Z",
+  "signer_seed_hex": "9999999999999999999999999999999999999999999999999999999999999999",
+  "signer_did_hex": "332ebe8d27cb7323b3a401c1c13b5dd64bccc0e10ecda1c2b5d11a03779a85e5",
+  "fixed_valid_from": "2026-05-03T20:00:00.000Z",
+  "fixed_valid_until": "2026-06-03T20:00:00.000Z",
+  "pairs": [
+    {
+      "id": "001",
+      "kind": "open_checkout_mandate",
+      "aps": "aps-delegation-001.json",
+      "ap2": "ap2-intent-mandate-001.json",
+      "note": "APS delegation → AP2 OpenCheckoutMandate (intent / open). Round-trips back via ap2MandateToApsDelegation."
+    },
+    {
+      "id": "002",
+      "kind": "checkout_mandate",
+      "aps": "aps-delegation-002.json",
+      "ap2": "ap2-cart-mandate-002.json",
+      "note": "APS delegation + cart → AP2 CheckoutMandate (closed). One-way: cart contents not in APS delegation, so reverse trip loses items + total."
+    },
+    {
+      "id": "003",
+      "kind": "payment_mandate",
+      "aps": "aps-delegation-003.json",
+      "ap2": "ap2-payment-mandate-003.json",
+      "note": "APS delegation + transaction-specific amount → AP2 PaymentMandate (closed). Reverse trip carries amount + payee + instrument back into delegation.scope.constraints."
+    }
+  ],
+  "notes": {
+    "signing": "APS Ed25519 over RFC 8785 JCS of the mandate dict. The cross-impl APS audit path. Wire-level SD-JWT/JWS encoding lives in the gateway integration layer.",
+    "cnf_encoding": "AP2 cnf.jwk encodes the APS delegatee pubkey as OKP/Ed25519 with x = base64url(pubkey_bytes).",
+    "iat_exp": "Unix epoch seconds derived from policy_context.valid_from / valid_until."
+  }
+}

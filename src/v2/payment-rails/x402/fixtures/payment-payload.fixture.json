@@ -1,0 +1,16 @@
+{
+  "x402Version": 1,
+  "scheme": "exact",
+  "network": "base",
+  "payload": {
+    "signature": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "authorization": {
+      "from": "0x000000000000000000000000000000000000cafe",
+      "to": "0x000000000000000000000000000000000000beef",
+      "value": "1000000",
+      "validAfter": "0",
+      "validBefore": "1893456000",
+      "nonce": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  }
+}

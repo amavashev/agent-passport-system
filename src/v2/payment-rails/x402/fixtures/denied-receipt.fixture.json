@@ -1,0 +1,14 @@
+{
+  "claim_type": "aps:payment_denial:v1",
+  "receipt_id": "df56f0d314f2b5e176b9a122e17d6a73a1c002bde7621b397f4dbad13a1d3f57",
+  "signer_did": "34b4d9043156cb6dcf0beb0a2949b7559c940d2bcb6dbe8c53a9b30278e3a746",
+  "issued_at": "2026-05-03T20:00:00.000Z",
+  "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "rail_name": "x402-base-USDC",
+  "amount_base_units": "1000000",
+  "currency": "USDC",
+  "denial_reason": "rail_error",
+  "signature": "49401677e5c99c3dc32d1a2d068e1f14feaab8a387de428f7b6fadf439c897d9142828ad3f75ec106593dcf85c186c88c0419454b49b606c5b8c4a7bf529cd0c",
+  "reason_detail": "facilitator: invalid_signature"
+}

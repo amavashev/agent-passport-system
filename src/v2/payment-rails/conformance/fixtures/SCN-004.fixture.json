@@ -1,0 +1,27 @@
+{
+  "scenario_id": "SCN-004",
+  "description": "preAuthorize rejects with 'wallet_revoked' when bound wallet is revoked",
+  "kind": "pre_authorize_with_revocation",
+  "setup": {
+    "revoke_wallet_id": "wallet-conformance-fixed"
+  },
+  "input": {
+    "delegation": {
+      "receipt_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "scope": [
+        "commerce.purchase"
+      ],
+      "spend_limit_base_units": "1000000000000000000000000000000",
+      "wallet_id": "wallet-conformance-fixed",
+      "currency": "XNO"
+    },
+    "required_scope": "commerce.purchase",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "now": "2026-05-03T20:00:00.000Z"
+  },
+  "expected": {
+    "ok": false,
+    "denial_reason": "wallet_revoked"
+  }
+}

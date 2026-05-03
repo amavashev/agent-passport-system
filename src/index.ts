@@ -1455,3 +1455,176 @@ export type {
   InstructionFile,
   InstructionProvenanceReceipt,
 } from './v2/instruction-provenance/index.js'
+
+// ── v2.6.x payment-rails — public PaymentRail interface, signed
+//      PaymentReceipt + PaymentDenial primitives, composable
+//      governance hooks (preAuthorize, emitReceipt, emitDenial),
+//      Nano reference adapter. Custodial wallet + credential
+//      storage stay gateway-private.
+export {
+  // hooks
+  createDefaultGovernanceHooks,
+  emitDenial,
+  emitReceipt,
+  preAuthorize,
+  verifyPaymentDenial,
+  verifyPaymentReceipt,
+  // canonicalize
+  canonicalizeDenialForId,
+  canonicalizeDenialForSig,
+  canonicalizeInvoice,
+  canonicalizeReceiptForId,
+  canonicalizeReceiptForSig,
+  invoiceDigest,
+  paymentRailsSha256Hex,
+  // nano reference adapter
+  createNanoRail,
+  NanoPaymentRail,
+  rawToXno,
+  xnoToRaw,
+  // conformance harness
+  HARNESS_FIXED_NOW,
+  HARNESS_ISSUER_PRIV,
+  runConformance,
+  STANDARD_SCENARIOS,
+} from './v2/payment-rails/index.js'
+
+export type {
+  ConformanceContext,
+  ConformanceReport,
+  ConformanceScenario,
+  CreateInvoiceOpts,
+  DelegationView,
+  DenialReason,
+  DenialVerifyReason,
+  DenialVerifyResult,
+  EmitDenialInput,
+  EmitReceiptInput,
+  FetchBlockInfo,
+  FetchHistory,
+  GovernanceHooks,
+  InvoiceStatus,
+  NanoBlockInfo,
+  NanoHistoryEntry,
+  NanoRailConfig,
+  PaymentDenial,
+  PaymentInvoice,
+  PaymentRail,
+  PaymentReceipt,
+  PreAuthorizeInput,
+  PreAuthorizeResult,
+  ReceiptVerifyReason,
+  ReceiptVerifyResult,
+  RunConformanceOpts,
+  ScenarioOutcome,
+  ScenarioReport,
+  SendPaymentOpts,
+  VerifyTransactionResult,
+} from './v2/payment-rails/index.js'
+
+// ── AP2 v0.2 interop (Google Agent Payments Protocol) ────────────
+// Pinned to AP2 v0.2 (April 2026). Crosswalk between APS V2Delegation
+// and AP2 mandate dicts. See docs/governance/ap2-interop.md.
+export {
+  AP2_VERSION,
+  ap2MandateToApsDelegation,
+  apsToAp2CartMandate,
+  apsToAp2IntentMandate,
+  apsToAp2OpenPaymentMandate,
+  apsToAp2PaymentMandate,
+  signAp2Mandate,
+  verifyAp2Mandate,
+} from './v2/payment-rails/index.js'
+
+export type {
+  AP2Amount,
+  AP2CheckoutConstraint,
+  AP2CheckoutMandate,
+  AP2Cnf,
+  AP2Item,
+  AP2Mandate,
+  AP2Merchant,
+  AP2OpenCheckoutMandate,
+  AP2OpenPaymentMandate,
+  AP2PaymentConstraint,
+  AP2PaymentInstrument,
+  AP2PaymentMandate,
+  AP2VctCheckout,
+  AP2VctOpenCheckout,
+  AP2VctOpenPayment,
+  AP2VctPayment,
+  Ap2VerifyReason,
+  Ap2VerifyResult,
+  Ap2ToApsOptions,
+  ApsToAp2CartOptions,
+  ApsToAp2IntentOptions,
+  ApsToAp2OpenPaymentOptions,
+  ApsToAp2PaymentOptions,
+  CartDetails,
+  CartMandate,
+  IntentMandate,
+  SignedAP2Mandate,
+  VerifyAp2MandateOptions,
+} from './v2/payment-rails/index.js'
+
+// ── v2.6.x payment-rails / x402 reference adapter (Base + USDC) ──
+// Settles via the x402 v1 protocol against a caller-supplied
+// facilitator (Coinbase CDP public endpoint by default). Mocked
+// facilitator in tests; on-chain settlement happens via
+// EIP-3009 transferWithAuthorization at the facilitator.
+export {
+  createX402Rail,
+  USDC_BASE_MAINNET,
+  USDC_BASE_SEPOLIA,
+  X402_DEFAULT_FACILITATOR_URL,
+  X402_VERSION,
+  X402PaymentRail,
+} from './v2/payment-rails/index.js'
+
+export type {
+  EIP3009Authorization,
+  X402ExactSchemePayload,
+  X402FacilitatorSettle,
+  X402FacilitatorVerify,
+  X402Network,
+  X402PaymentPayload,
+  X402PaymentRequirements,
+  X402PaymentRequirementsResponse,
+  X402RailConfig,
+  X402Scheme,
+  X402SettleRequest,
+  X402SettleResponse,
+  X402SubmitOutcome,
+  X402VerifyRequest,
+  X402VerifyResponse,
+} from './v2/payment-rails/index.js'
+
+// ── v2.6.x payment-rails / Stripe Issuing reference adapter ──────
+// Mints agent-scoped one-time virtual cards via the Stripe Issuing
+// API and intercepts issuing_authorization.request webhooks. APS
+// gates run before Stripe is told to approve, so an authorization
+// that would violate delegation scope, budget, time window, or
+// wallet-revoked status is declined at the rail boundary and never
+// settles. Test mode only; constructor refuses sk_live_ keys.
+export {
+  createStripeIssuingRail,
+  defaultMapDelegationToSpendingControls,
+  StripeIssuingRail,
+  verifyStripeSignature,
+} from './v2/payment-rails/index.js'
+
+export type {
+  StripeAuthorization,
+  StripeAuthorizationDecision,
+  StripeAuthorizationEvent,
+  StripeCardholderRef,
+  StripeDelegationLookup,
+  StripeFetchLike,
+  StripeIssuingConfig,
+  StripeMerchantData,
+  StripeSpendingControls,
+  StripeSpendingControlsMapper,
+  StripeSpendingLimit,
+  StripeSpendingLimitInterval,
+  StripeVirtualCard,
+} from './v2/payment-rails/index.js'

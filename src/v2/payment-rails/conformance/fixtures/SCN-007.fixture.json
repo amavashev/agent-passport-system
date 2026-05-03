@@ -1,0 +1,28 @@
+{
+  "scenario_id": "SCN-007",
+  "description": "emitReceipt output round-trips through JSON canonicalization",
+  "kind": "emit_receipt_roundtrip",
+  "input": {
+    "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rail_name": "nano",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "tx_proof": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "issued_at": "2026-05-03T20:00:00.000Z"
+  },
+  "issuer_private_key_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "expected": {
+    "claim_type": "aps:payment_receipt:v1",
+    "receipt_id": "c859fe764cffb546d348763b5273e744e85b2bf840321ed319113601e6b0e5f8",
+    "signer_did": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+    "issued_at": "2026-05-03T20:00:00.000Z",
+    "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "action_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rail_name": "nano",
+    "amount_base_units": "1000",
+    "currency": "XNO",
+    "tx_proof": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "signature": "e75e2b5109022c27aa012382b8179b7b3ccb1cf8d4f225e9a8ba50fbdd549b766d6b2ae4bd6bae51c5eb7c61ece895c0c8801453aa73c54be23a0e7221f05102"
+  }
+}
