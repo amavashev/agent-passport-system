@@ -85,6 +85,68 @@ describe('AP2 v0.2 interop — module sanity', () => {
   })
 })
 
+// ── Spend-cap alternate forms (AP2 resolver) ─────────────────────
+// Mirrors the trio in tests/v2/payment-rails/mpp.test.ts.
+// AP2 calls resolveSpendLimitCents with canonicalKey='commerce.spend_limit',
+// which (per scope-resolution.ts) skips the AP2-alias fallback step and
+// goes resource_limits['commerce.spend_limit'] → constraints.spend_limit_cents
+// (string). resource_limits.spend_limit_cents (Tier-1 canonical for other
+// rails) is NOT picked up by the AP2 path.
+
+describe('AP2 spend-cap resolution — alternate forms', () => {
+  it('(a) resource_limits[commerce.spend_limit] surfaces in payment.budget', () => {
+    const d = _delegation({
+      scope: {
+        action_categories: ['commerce.payment'],
+        domain: 'commerce',
+        resource_limits: { 'commerce.spend_limit': 50_000 },
+        constraints: {},
+      },
+    })
+    const m = apsToAp2OpenPaymentMandate(d, { currency: 'USD' })
+    const budget = m.constraints.find((c) => c.type === 'payment.budget')
+    assert.ok(budget && budget.type === 'payment.budget')
+    if (budget?.type !== 'payment.budget') return
+    assert.equal(budget.total.value, 50_000)
+  })
+
+  it('(b) resource_limits.spend_limit_cents is NOT picked up — AP2 yields 0 sentinel', () => {
+    // NOTE: AP2's _spendLimitFromDelegation overrides canonicalKey to
+    // 'commerce.spend_limit'. resolveSpendLimitCents then skips the
+    // AP2-alias fallback and falls through to constraints (string).
+    // Tier-1 canonical 'spend_limit_cents' is invisible to AP2 — by design.
+    const d = _delegation({
+      scope: {
+        action_categories: ['commerce.payment'],
+        domain: 'commerce',
+        resource_limits: { spend_limit_cents: 50_000 },
+        constraints: {},
+      },
+    })
+    const m = apsToAp2OpenPaymentMandate(d, { currency: 'USD' })
+    const budget = m.constraints.find((c) => c.type === 'payment.budget')
+    assert.ok(budget && budget.type === 'payment.budget')
+    if (budget?.type !== 'payment.budget') return
+    assert.equal(budget.total.value, 0)
+  })
+
+  it('(c) constraints.spend_limit_cents string fallback round-trips to 50000', () => {
+    const d = _delegation({
+      scope: {
+        action_categories: ['commerce.payment'],
+        domain: 'commerce',
+        resource_limits: {},
+        constraints: { spend_limit_cents: '50000' },
+      },
+    })
+    const m = apsToAp2OpenPaymentMandate(d, { currency: 'USD' })
+    const budget = m.constraints.find((c) => c.type === 'payment.budget')
+    assert.ok(budget && budget.type === 'payment.budget')
+    if (budget?.type !== 'payment.budget') return
+    assert.equal(budget.total.value, 50_000)
+  })
+})
+
 // ── apsToAp2IntentMandate (OpenCheckoutMandate) ──────────────────
 
 describe('apsToAp2IntentMandate', () => {
