@@ -29,6 +29,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
 import type { V2Delegation } from '../../types.js'
+import { csvToList } from '../csv.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
 import {
   ACP_API_VERSION,
@@ -60,15 +61,6 @@ function canonicalDigest(obj: unknown): string {
 
 function nowIso(): string {
   return new Date().toISOString()
-}
-
-// Internal: parse CSV-typed constraint values into trimmed string arrays.
-function csvToList(s: string | undefined): string[] {
-  if (!s) return []
-  return s
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean)
 }
 
 // ── APS ↔ ACP error mapping ───────────────────────────────────────

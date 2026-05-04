@@ -30,6 +30,7 @@ import { randomUUID } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
 import type { V2Delegation } from '../../types.js'
+import { csvToList } from '../csv.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
 import { MPP_VERSION } from './types.js'
 export { MPP_VERSION } from './types.js'
@@ -47,14 +48,6 @@ import type {
 
 function nowIso(): string {
   return new Date().toISOString()
-}
-
-function csvToList(s: string | undefined): string[] {
-  if (!s) return []
-  return s
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean)
 }
 
 // ── APS ↔ MPP HTTP error mapping ──────────────────────────────────

@@ -31,7 +31,7 @@ import {
   type ActionReceipt,
   type ValuesFloor,
   type RecoveryPolicy,
-} from 'agent-passport-system'
+} from '../../src/index.js'
 
 // ── Composio-Agnostic Tool Interface ──
 

@@ -32,6 +32,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { sha256Hex } from '../canonicalize.js'
+import { csvToList } from '../csv.js'
 import { emitDenial, emitReceipt, preAuthorize } from '../hooks.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
 import type {
@@ -89,11 +90,6 @@ export function defaultMapDelegationToSpendingControls(
   const sc: SpendingControls = {
     spending_limits: [{ amount: Math.floor(limit), interval: 'all_time' }],
   }
-
-  const csvToList = (raw?: string): string[] =>
-    raw === undefined
-      ? []
-      : raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
 
   const allowedCats = csvToList(constraints.allowed_merchant_categories)
   if (allowedCats.length > 0) sc.allowed_categories = allowedCats
