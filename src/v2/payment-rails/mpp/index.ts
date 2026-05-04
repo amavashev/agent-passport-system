@@ -29,7 +29,34 @@
 import { randomUUID } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
+import {
+  parseDidUri,
+  publicKeyHexFromMethod,
+  resolveVerificationMethod,
+} from '../../../core/did-uri.js'
+import type { RotatableDIDDocument } from '../../../types/passport.js'
 import { verifyOwnerConfirmation } from '../../human-escalation.js'
+
+export type MppResolveDidDocument = (
+  agentId: string,
+) => Promise<RotatableDIDDocument | null>
+
+function _mppSignerFor(
+  privateKeyHex: string,
+  agentId: string | undefined,
+  keyRef: string | undefined,
+): string {
+  if (agentId && keyRef) {
+    if (!agentId.startsWith('did:')) {
+      throw new Error(`signMpp*: issuer_agent_id must be a DID, got '${agentId}'`)
+    }
+    if (keyRef.includes('#')) {
+      throw new Error("signMpp*: issuer_key_ref must not contain '#'")
+    }
+    return `${agentId}#${keyRef}`
+  }
+  return publicKeyFromPrivate(privateKeyHex)
+}
 import type { OwnerConfirmation, V2Delegation } from '../../types.js'
 import { csvToList } from '../csv.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
@@ -365,13 +392,22 @@ export interface SignMppReceiptInput {
   resource: string
   delegation_ref?: string
   agent_id: string
+  /** Phase 4.1 / P12: when supplied alongside `issuer_key_ref`, signer
+   *  becomes a DID URI of the form `${issuer_agent_id}#${issuer_key_ref}`.
+   *  Compatible-superset; legacy raw-hex signer when either is omitted. */
+  issuer_agent_id?: string
+  issuer_key_ref?: string
 }
 
 export function signMppReceipt(
   input: SignMppReceiptInput,
   signerPrivateKeyHex: string,
 ): MppApsReceipt {
-  const signerPub = publicKeyFromPrivate(signerPrivateKeyHex)
+  const signerPub = _mppSignerFor(
+    signerPrivateKeyHex,
+    input.issuer_agent_id,
+    input.issuer_key_ref,
+  )
 
   const unsigned: Omit<MppApsReceipt, 'signature'> = {
     receipt_id: `mppr_${randomUUID()}`,
@@ -398,6 +434,10 @@ export interface VerifyMppOptions {
   now?: Date
   ttl_seconds?: number
   expected_signer?: string
+  /** Phase 4.1 / P12: required when signer is a DID URI. The async
+   *  `verifyMppReceiptWithDID` / `verifyMppDenialWithDID` paths invoke
+   *  this resolver. The sync path returns DID_RESOLVER_MISSING. */
+  resolveDidDocument?: MppResolveDidDocument
 }
 
 export function verifyMppReceipt(
@@ -444,7 +484,47 @@ export function verifyMppReceipt(
   // signature verify — strip sig, canonicalize, verify
   const { signature, ...rest } = receipt
   const sigBytes = canonicalizeJCS(rest)
+  if (typeof receipt.signer === 'string' && receipt.signer.startsWith('did:')) {
+    return {
+      valid: false,
+      reason: 'DID_RESOLVER_MISSING',
+      detail: 'use verifyMppReceiptWithDID for DID-URI signers',
+    }
+  }
   if (!edVerify(sigBytes, signature, receipt.signer)) {
+    return { valid: false, reason: 'SIGNATURE_INVALID', detail: 'Ed25519 verify failed' }
+  }
+  return { valid: true }
+}
+
+/** Phase 4.1 / P12: async receipt verifier with DID URI support. */
+export async function verifyMppReceiptWithDID(
+  receipt: MppApsReceipt,
+  options: VerifyMppOptions = {},
+): Promise<MppVerifyResult> {
+  const sync = verifyMppReceipt(receipt, options)
+  if (sync.valid) return sync
+  if (sync.reason !== 'DID_RESOLVER_MISSING') return sync
+  if (!options.resolveDidDocument) {
+    return { valid: false, reason: 'DID_RESOLVER_MISSING' }
+  }
+  const parsed = parseDidUri(receipt.signer)
+  if (!parsed) return { valid: false, reason: 'DID_URI_INVALID' }
+  const didDoc = await options.resolveDidDocument(parsed.agentId)
+  if (!didDoc) return { valid: false, reason: 'DID_DOC_NOT_FOUND' }
+  const issuedMs = Date.parse(receipt.issued_at)
+  const result = resolveVerificationMethod(
+    didDoc,
+    receipt.signer,
+    options.now ? options.now.getTime() : undefined,
+    Number.isFinite(issuedMs) ? issuedMs : undefined,
+  )
+  if (!result) return { valid: false, reason: 'DID_KEY_NOT_IN_DOC' }
+  if (result.retired) return { valid: false, reason: 'DID_KEY_RETIRED' }
+  const pubHex = publicKeyHexFromMethod(result.method)
+  const { signature, ...rest } = receipt
+  const sigBytes = canonicalizeJCS(rest)
+  if (!edVerify(sigBytes, signature, pubHex)) {
     return { valid: false, reason: 'SIGNATURE_INVALID', detail: 'Ed25519 verify failed' }
   }
   return { valid: true }
@@ -458,13 +538,20 @@ export interface SignMppDenialInput {
   reason: MppDenialReason
   delegation_ref?: string
   agent_id: string
+  /** Phase 4.1 / P12: see SignMppReceiptInput.issuer_agent_id. */
+  issuer_agent_id?: string
+  issuer_key_ref?: string
 }
 
 export function signMppDenial(
   input: SignMppDenialInput,
   signerPrivateKeyHex: string,
 ): MppDenial {
-  const signerPub = publicKeyFromPrivate(signerPrivateKeyHex)
+  const signerPub = _mppSignerFor(
+    signerPrivateKeyHex,
+    input.issuer_agent_id,
+    input.issuer_key_ref,
+  )
   const mapped = apsToMppHttpError(input.reason)
 
   const unsigned: Omit<MppDenial, 'signature'> = {
@@ -531,7 +618,47 @@ export function verifyMppDenial(
 
   const { signature, ...rest } = denial
   const sigBytes = canonicalizeJCS(rest)
+  if (typeof denial.signer === 'string' && denial.signer.startsWith('did:')) {
+    return {
+      valid: false,
+      reason: 'DID_RESOLVER_MISSING',
+      detail: 'use verifyMppDenialWithDID for DID-URI signers',
+    }
+  }
   if (!edVerify(sigBytes, signature, denial.signer)) {
+    return { valid: false, reason: 'SIGNATURE_INVALID', detail: 'Ed25519 verify failed' }
+  }
+  return { valid: true }
+}
+
+/** Phase 4.1 / P12: async denial verifier with DID URI support. */
+export async function verifyMppDenialWithDID(
+  denial: MppDenial,
+  options: VerifyMppOptions = {},
+): Promise<MppVerifyResult> {
+  const sync = verifyMppDenial(denial, options)
+  if (sync.valid) return sync
+  if (sync.reason !== 'DID_RESOLVER_MISSING') return sync
+  if (!options.resolveDidDocument) {
+    return { valid: false, reason: 'DID_RESOLVER_MISSING' }
+  }
+  const parsed = parseDidUri(denial.signer)
+  if (!parsed) return { valid: false, reason: 'DID_URI_INVALID' }
+  const didDoc = await options.resolveDidDocument(parsed.agentId)
+  if (!didDoc) return { valid: false, reason: 'DID_DOC_NOT_FOUND' }
+  const issuedMs = Date.parse(denial.issued_at)
+  const result = resolveVerificationMethod(
+    didDoc,
+    denial.signer,
+    options.now ? options.now.getTime() : undefined,
+    Number.isFinite(issuedMs) ? issuedMs : undefined,
+  )
+  if (!result) return { valid: false, reason: 'DID_KEY_NOT_IN_DOC' }
+  if (result.retired) return { valid: false, reason: 'DID_KEY_RETIRED' }
+  const pubHex = publicKeyHexFromMethod(result.method)
+  const { signature, ...rest } = denial
+  const sigBytes = canonicalizeJCS(rest)
+  if (!edVerify(sigBytes, signature, pubHex)) {
     return { valid: false, reason: 'SIGNATURE_INVALID', detail: 'Ed25519 verify failed' }
   }
   return { valid: true }
