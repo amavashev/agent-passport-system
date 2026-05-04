@@ -37,6 +37,46 @@ import type {
   PreAuthorizeResult,
 } from './types.js'
 import type { OwnerConfirmation } from '../types.js'
+import type { ScopeOfClaim } from '../accountability/types/base.js'
+
+// Phase 4.1 / Q1 — accountability-aligned claim_type literals. Verifier
+// accepts both the legacy 'aps:*:v1' and the new 'rail.*' literals so
+// previously-issued receipts continue to verify.
+const RAIL_PAYMENT_RECEIPT_CLAIM_TYPE = 'rail.payment.v1' as const
+const LEGACY_PAYMENT_RECEIPT_CLAIM_TYPE = 'aps:payment_receipt:v1' as const
+const RAIL_PAYMENT_DENIAL_CLAIM_TYPE = 'rail.payment.denial.v1' as const
+const LEGACY_PAYMENT_DENIAL_CLAIM_TYPE = 'aps:payment_denial:v1' as const
+
+/** Default scope_of_claim for foundation receipts. Override via
+ *  EmitReceiptInput.scope_of_claim when caller has a richer assertion. */
+function defaultPaymentReceiptScope(): ScopeOfClaim {
+  return {
+    asserts: 'aps:rail.payment:emit — a payment instruction was emitted on the rail under the named delegation; tx_proof anchors the rail-side outcome.',
+    does_not_assert: [
+      'recipient earned the value',
+      'underlying contribution validity',
+      'settlement finality (rails have dispute/refund/chargeback windows)',
+      'counterparty legal identity',
+    ],
+    capture_mode: 'gateway_observed',
+    completeness: 'complete',
+    self_attested: false,
+  }
+}
+
+function defaultPaymentDenialScope(): ScopeOfClaim {
+  return {
+    asserts: 'aps:rail.payment:deny — a payment instruction was refused on the rail with a closed-taxonomy denial reason.',
+    does_not_assert: [
+      'the rail itself is unavailable',
+      'the agent acted maliciously',
+      'the underlying delegation is invalid (denial may flag a single missing constraint)',
+    ],
+    capture_mode: 'gateway_observed',
+    completeness: 'complete',
+    self_attested: false,
+  }
+}
 
 const VALID_DENIAL_REASONS: readonly DenialReason[] = [
   'no_commerce_scope',
@@ -251,8 +291,19 @@ export function emitReceipt(
   const signer_did = publicKeyFromPrivate(issuerPrivateKeyHex)
   const issued_at = input.issued_at ?? _nowIso()
 
+  // Phase 4.1 / Q1: emit produces byte-stable legacy shape by default to
+  // preserve fixture-pinned byte-parity tests. Callers opting into the
+  // accountability-aligned shape pass `accountability_shape: true` (or
+  // supply a `scope_of_claim`); the resulting receipt carries the new
+  // claim_type literal, timestamp alias, and scope_of_claim. The verifier
+  // accepts both shapes so the migration is compatible-superset.
+  const useAccountabilityShape =
+    input.accountability_shape === true || input.scope_of_claim !== undefined
+
   const draft: PaymentReceipt = {
-    claim_type: 'aps:payment_receipt:v1',
+    claim_type: useAccountabilityShape
+      ? RAIL_PAYMENT_RECEIPT_CLAIM_TYPE
+      : LEGACY_PAYMENT_RECEIPT_CLAIM_TYPE,
     receipt_id: '',
     signer_did,
     issued_at,
@@ -263,6 +314,10 @@ export function emitReceipt(
     currency: input.currency,
     tx_proof: input.tx_proof,
     signature: '',
+  }
+  if (useAccountabilityShape) {
+    draft.timestamp = issued_at
+    draft.scope_of_claim = input.scope_of_claim ?? defaultPaymentReceiptScope()
   }
   if (input.invoice_id !== undefined) {
     draft.invoice_id = input.invoice_id
@@ -288,8 +343,13 @@ export function emitDenial(
   const signer_did = publicKeyFromPrivate(issuerPrivateKeyHex)
   const issued_at = input.issued_at ?? _nowIso()
 
+  const useAccountabilityShape =
+    input.accountability_shape === true || input.scope_of_claim !== undefined
+
   const draft: PaymentDenial = {
-    claim_type: 'aps:payment_denial:v1',
+    claim_type: useAccountabilityShape
+      ? RAIL_PAYMENT_DENIAL_CLAIM_TYPE
+      : LEGACY_PAYMENT_DENIAL_CLAIM_TYPE,
     receipt_id: '',
     signer_did,
     issued_at,
@@ -300,6 +360,10 @@ export function emitDenial(
     currency: input.currency,
     denial_reason: input.denial_reason,
     signature: '',
+  }
+  if (useAccountabilityShape) {
+    draft.timestamp = issued_at
+    draft.scope_of_claim = input.scope_of_claim ?? defaultPaymentDenialScope()
   }
   if (input.reason_detail !== undefined) {
     draft.reason_detail = input.reason_detail
@@ -324,8 +388,27 @@ export interface ReceiptVerifyResult {
 }
 
 export function verifyPaymentReceipt(receipt: PaymentReceipt): ReceiptVerifyResult {
-  if (receipt.claim_type !== 'aps:payment_receipt:v1') {
+  // Phase 4.1 / Q1: accept both legacy and accountability-aligned literals.
+  if (
+    receipt.claim_type !== LEGACY_PAYMENT_RECEIPT_CLAIM_TYPE &&
+    receipt.claim_type !== RAIL_PAYMENT_RECEIPT_CLAIM_TYPE
+  ) {
     return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
+  }
+  // When the new shape is in use, enforce timestamp == issued_at and a
+  // non-empty scope_of_claim.asserts. Legacy receipts (without these
+  // fields) skip these checks.
+  if (receipt.claim_type === RAIL_PAYMENT_RECEIPT_CLAIM_TYPE) {
+    if (receipt.timestamp !== receipt.issued_at) {
+      return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
+    }
+    if (
+      !receipt.scope_of_claim ||
+      typeof receipt.scope_of_claim.asserts !== 'string' ||
+      receipt.scope_of_claim.asserts.length === 0
+    ) {
+      return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
+    }
   }
   const expectedId = sha256Hex(canonicalizeReceiptForId(receipt))
   if (receipt.receipt_id !== expectedId) {
@@ -349,8 +432,23 @@ export interface DenialVerifyResult {
 }
 
 export function verifyPaymentDenial(denial: PaymentDenial): DenialVerifyResult {
-  if (denial.claim_type !== 'aps:payment_denial:v1') {
+  if (
+    denial.claim_type !== LEGACY_PAYMENT_DENIAL_CLAIM_TYPE &&
+    denial.claim_type !== RAIL_PAYMENT_DENIAL_CLAIM_TYPE
+  ) {
     return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
+  }
+  if (denial.claim_type === RAIL_PAYMENT_DENIAL_CLAIM_TYPE) {
+    if (denial.timestamp !== denial.issued_at) {
+      return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
+    }
+    if (
+      !denial.scope_of_claim ||
+      typeof denial.scope_of_claim.asserts !== 'string' ||
+      denial.scope_of_claim.asserts.length === 0
+    ) {
+      return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
+    }
   }
   if (!VALID_DENIAL_REASONS.includes(denial.denial_reason)) {
     return { valid: false, reason: 'INVALID_DENIAL_REASON' }

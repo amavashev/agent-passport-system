@@ -574,3 +574,86 @@ describe('fixtures — byte-parity round trip', () => {
     assert.equal(v.valid, true, `fixture verify failed: ${v.reason}`)
   })
 })
+
+// ── Phase 4.1 / Q1 — accountability-aligned shape ─────────────────
+
+describe('Phase 4.1 / Q1 — foundation accountability shape', () => {
+  it('new emit path populates claim_type rail.payment.v1, timestamp, scope_of_claim', () => {
+    const r = emitReceipt(
+      {
+        delegation_ref: 'd'.repeat(64),
+        action_ref: 'a'.repeat(64),
+        rail_name: 'nano',
+        amount_base_units: xnoToRaw('0.001'),
+        currency: 'XNO',
+        tx_proof: 'b'.repeat(64),
+        accountability_shape: true,
+      },
+      ISSUER_PRIV,
+    )
+    assert.equal(r.claim_type, 'rail.payment.v1')
+    assert.equal(r.timestamp, r.issued_at)
+    assert.ok(r.scope_of_claim, 'scope_of_claim must be populated')
+    assert.ok(r.scope_of_claim!.asserts.length > 0)
+    assert.equal(verifyPaymentReceipt(r).valid, true)
+  })
+
+  it('legacy-shape receipt (no claim_type accountability literal) still verifies', () => {
+    const r = emitReceipt(
+      {
+        delegation_ref: 'd'.repeat(64),
+        action_ref: 'a'.repeat(64),
+        rail_name: 'nano',
+        amount_base_units: '1',
+        currency: 'XNO',
+        tx_proof: 'c'.repeat(64),
+      },
+      ISSUER_PRIV,
+    )
+    assert.equal(r.claim_type, 'aps:payment_receipt:v1')
+    assert.equal(r.timestamp, undefined)
+    assert.equal(r.scope_of_claim, undefined)
+    assert.equal(verifyPaymentReceipt(r).valid, true)
+  })
+
+  it('verifier rejects accountability-shape receipt with mismatched timestamp', () => {
+    const r = emitReceipt(
+      {
+        delegation_ref: 'd'.repeat(64),
+        action_ref: 'a'.repeat(64),
+        rail_name: 'nano',
+        amount_base_units: '1',
+        currency: 'XNO',
+        tx_proof: 'd'.repeat(64),
+        accountability_shape: true,
+      },
+      ISSUER_PRIV,
+    )
+    const tampered = { ...r, timestamp: '1999-01-01T00:00:00.000Z' }
+    assert.equal(verifyPaymentReceipt(tampered).valid, false)
+  })
+
+  it('scope_of_claim override propagates to receipt', () => {
+    const custom = {
+      asserts: 'custom payment evidence claim',
+      does_not_assert: ['custom non-assertion'],
+      capture_mode: 'gateway_observed' as const,
+      completeness: 'complete' as const,
+      self_attested: false,
+    }
+    const r = emitReceipt(
+      {
+        delegation_ref: 'd'.repeat(64),
+        action_ref: 'a'.repeat(64),
+        rail_name: 'nano',
+        amount_base_units: '1',
+        currency: 'XNO',
+        tx_proof: 'e'.repeat(64),
+        scope_of_claim: custom,
+      },
+      ISSUER_PRIV,
+    )
+    assert.deepEqual(r.scope_of_claim, custom)
+    assert.equal(r.claim_type, 'rail.payment.v1')
+  })
+})
