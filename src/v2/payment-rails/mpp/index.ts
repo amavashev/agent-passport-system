@@ -401,6 +401,12 @@ export interface SignMppReceiptInput {
    *  Compatible-superset; legacy raw-hex signer when either is omitted. */
   issuer_agent_id?: string
   issuer_key_ref?: string
+  /** Phase 4.1 / Q2: link to the AttributionReceipt this MPP exchange
+   *  pays against. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: link to the SettlementRecord whose payment_obligations
+   *  declared this payment. */
+  settlement_record_id?: string
 }
 
 function defaultMppReceiptScope(): import('../../accountability/types/base.js').ScopeOfClaim {
@@ -450,6 +456,12 @@ export function signMppReceipt(
     unsigned.claim_type = 'rail.mpp.v1'
     unsigned.timestamp = issued_at
     unsigned.scope_of_claim = input.scope_of_claim ?? defaultMppReceiptScope()
+  }
+  if (input.attribution_receipt_id !== undefined) {
+    unsigned.attribution_receipt_id = input.attribution_receipt_id
+  }
+  if (input.settlement_record_id !== undefined) {
+    unsigned.settlement_record_id = input.settlement_record_id
   }
 
   const sigBytes = canonicalizeJCS(unsigned)

@@ -122,6 +122,14 @@ export interface PaymentReceipt {
   tx_proof: string
   /** Optional invoice_id this receipt settles. */
   invoice_id?: string
+  /** Phase 4.1 / Q2: cross-receipt link to an AttributionReceipt this
+   *  payment is settling. The chain is intent-side: the AttributionReceipt
+   *  proves entitlement; this field declares which one. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: cross-receipt link to a SettlementRecord whose
+   *  `payment_obligations[]` includes this payment. Pair with
+   *  attribution_receipt_id for full chain traversal. */
+  settlement_record_id?: string
   /** Ed25519 signature over canonical(receipt with signature emptied), hex. */
   signature: string
 }
@@ -297,6 +305,11 @@ export interface EmitReceiptInput {
    *  pubkey form (publicKeyFromPrivate). Compatible-superset. */
   issuer_agent_id?: string
   issuer_key_ref?: string
+  /** Phase 4.1 / Q2: link to the AttributionReceipt this payment settles. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: link to the SettlementRecord whose payment_obligations
+   *  declared this payment. */
+  settlement_record_id?: string
 }
 
 export interface EmitDenialInput {

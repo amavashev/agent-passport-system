@@ -240,6 +240,13 @@ export interface AcpReceipt {
   /** ISO 8601 UTC with millisecond precision + Z. */
   issued_at: string
 
+  /** Phase 4.1 / Q2: cross-receipt link to the AttributionReceipt this
+   *  ACP op is paying against. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: cross-receipt link to the SettlementRecord whose
+   *  payment_obligations[] declared this payment. */
+  settlement_record_id?: string
+
   /** Hex Ed25519 signature over the canonical receipt body, sig field cleared. */
   signature: string
 

@@ -359,6 +359,12 @@ export function emitReceipt(
   if (input.invoice_id !== undefined) {
     draft.invoice_id = input.invoice_id
   }
+  if (input.attribution_receipt_id !== undefined) {
+    draft.attribution_receipt_id = input.attribution_receipt_id
+  }
+  if (input.settlement_record_id !== undefined) {
+    draft.settlement_record_id = input.settlement_record_id
+  }
 
   const receipt_id = sha256Hex(canonicalizeReceiptForId(draft))
   const withId: PaymentReceipt = { ...draft, receipt_id }

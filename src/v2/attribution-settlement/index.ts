@@ -8,6 +8,7 @@
 // canonicalization and Build B weight formats; zero duplicate crypto.
 
 export type {
+  PaymentObligationRef,
   SettlementAxisIndex,
   SettlementContributor,
   SettlementPeriod,

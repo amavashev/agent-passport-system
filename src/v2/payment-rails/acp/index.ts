@@ -426,6 +426,11 @@ export interface SignAcpReceiptInput {
    *  signer falls back to the legacy raw-hex pubkey form. */
   issuer_agent_id?: string
   issuer_key_ref?: string
+  /** Phase 4.1 / Q2: link to the AttributionReceipt this op pays against. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: link to the SettlementRecord whose payment_obligations
+   *  declared this payment. */
+  settlement_record_id?: string
 }
 
 function defaultAcpReceiptScope(): import('../../accountability/types/base.js').ScopeOfClaim {
@@ -474,6 +479,12 @@ export function signAcpReceipt(
     unsigned.claim_type = 'rail.acp.v1'
     unsigned.timestamp = issued_at
     unsigned.scope_of_claim = input.scope_of_claim ?? defaultAcpReceiptScope()
+  }
+  if (input.attribution_receipt_id !== undefined) {
+    unsigned.attribution_receipt_id = input.attribution_receipt_id
+  }
+  if (input.settlement_record_id !== undefined) {
+    unsigned.settlement_record_id = input.settlement_record_id
   }
 
   const sigBytes = canonicalizeJCS(unsigned)

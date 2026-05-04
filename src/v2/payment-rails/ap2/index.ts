@@ -648,6 +648,13 @@ export interface SignAp2MandateOptions {
    *  legacy raw-hex pubkey form is used. Compatible-superset. */
   issuer_agent_id?: string
   issuer_key_ref?: string
+  /** Phase 4.1 / Q2: link to the AttributionReceipt this mandate is
+   *  paying against. Sits on the envelope, not the mandate dict, so
+   *  the AP2 wire-level signature stays byte-identical to legacy. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: link to the SettlementRecord whose payment_obligations
+   *  declared the payment this mandate authorizes. Envelope-side. */
+  settlement_record_id?: string
 }
 
 function defaultAp2MandateScope(): import('../../accountability/types/base.js').ScopeOfClaim {
@@ -685,6 +692,12 @@ export function signAp2Mandate<T extends AP2Mandate>(
     envelope.claim_type = 'rail.ap2.mandate.v1'
     envelope.timestamp = new Date().toISOString()
     envelope.scope_of_claim = options.scope_of_claim ?? defaultAp2MandateScope()
+  }
+  if (options.attribution_receipt_id !== undefined) {
+    envelope.attribution_receipt_id = options.attribution_receipt_id
+  }
+  if (options.settlement_record_id !== undefined) {
+    envelope.settlement_record_id = options.settlement_record_id
   }
   return envelope
 }

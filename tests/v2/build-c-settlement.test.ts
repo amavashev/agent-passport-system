@@ -502,3 +502,75 @@ describe('Build C S5: input_receipts_hash recomputes when input receipts are sup
     )
   })
 })
+
+// ─────────────────────────────────────────────────────────────
+// Phase 4.1 / Q2 — payment_obligations field (compatible-superset)
+// ─────────────────────────────────────────────────────────────
+
+describe('Build C / Q2: payment_obligations is compatible-superset', () => {
+  it('without payment_obligations, signed record verifies and canonicalizes byte-for-byte to pre-Q2 shape', () => {
+    const period: AttributionSettlementPeriod = {
+      t0: '2026-05-04T00:00:00.000Z',
+      t1: '2026-05-05T00:00:00.000Z',
+      period_id: 'q2-cs-001',
+    }
+    const unsigned = aggregateAttributionPrimitives([], period, {
+      gateway_did: GATEWAY_DID,
+      issued_at: '2026-05-04T12:00:00.000Z',
+    })
+    // Field NOT set → must be omitted from canonical bytes by canonicalize().
+    assert.equal(
+      (unsigned as { payment_obligations?: unknown[] }).payment_obligations,
+      undefined,
+      'aggregateAttributionPrimitives should not synthesize payment_obligations',
+    )
+    const signature = signSettlementRecord(unsigned, GATEWAY_PRIV)
+    const record: AttributionSettlementRecord = { ...unsigned, signature }
+    assert.equal(verifySettlementSignature(record, GATEWAY_PUB), true)
+    assert.equal(verifySettlementRecord(record, { gatewayPublicKeyHex: GATEWAY_PUB }).valid, true)
+  })
+
+  it('with payment_obligations, signed record canonicalizes deterministically and verifies', async () => {
+    const period: AttributionSettlementPeriod = {
+      t0: '2026-05-04T00:00:00.000Z',
+      t1: '2026-05-05T00:00:00.000Z',
+      period_id: 'q2-cs-002',
+    }
+    const unsigned = aggregateAttributionPrimitives([], period, {
+      gateway_did: GATEWAY_DID,
+      issued_at: '2026-05-04T12:00:00.000Z',
+    })
+    const obligations = [
+      {
+        recipient_did: 'did:aps:c1',
+        amount_cents: 1000,
+        currency: 'usd',
+        rail_hint: 'foundation' as const,
+        attribution_receipt_id: 'attr_r1',
+      },
+      {
+        recipient_did: 'did:aps:c2',
+        amount_cents: 2500,
+        currency: 'usd',
+        rail_hint: 'acp' as const,
+        attribution_receipt_id: 'attr_r2',
+      },
+    ]
+    const withObligations = { ...unsigned, payment_obligations: obligations }
+    const sig1 = signSettlementRecord(withObligations, GATEWAY_PRIV)
+    const sig2 = signSettlementRecord(withObligations, GATEWAY_PRIV)
+    assert.equal(sig1, sig2, 'canonicalization must be deterministic')
+    const record = { ...withObligations, signature: sig1 } as AttributionSettlementRecord
+    assert.equal(verifySettlementSignature(record, GATEWAY_PUB), true)
+    // Tamper with the obligations → signature breaks.
+    const tampered = {
+      ...record,
+      payment_obligations: [...obligations, {
+        recipient_did: 'did:aps:c3',
+        amount_cents: 999,
+        currency: 'usd',
+      }],
+    } as AttributionSettlementRecord
+    assert.equal(verifySettlementSignature(tampered, GATEWAY_PUB), false)
+  })
+})
