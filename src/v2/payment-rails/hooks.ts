@@ -18,6 +18,12 @@ import { sign, publicKeyFromPrivate, verify as edVerify } from '../../crypto/key
 import { canonicalize } from '../../core/canonical.js'
 import { createHash } from 'node:crypto'
 import {
+  parseDidUri,
+  resolveVerificationMethod,
+  publicKeyHexFromMethod,
+} from '../../core/did-uri.js'
+import type { RotatableDIDDocument } from '../../types/passport.js'
+import {
   canonicalizeDenialForId,
   canonicalizeDenialForSig,
   canonicalizeReceiptForId,
@@ -244,11 +250,42 @@ export function preAuthorize(
 
 // ── emitReceipt ───────────────────────────────────────────────────
 
+/**
+ * Phase 4.1 / P12: when both `issuerAgentId` AND `issuerKeyRef` are
+ * supplied on EmitReceiptInput, signer_did takes the form
+ * `${issuerAgentId}#${issuerKeyRef}` (a DID URI). The verifier resolves
+ * this against the agent's RotatableDIDDocument and checks retiredAt.
+ * When either is missing, signer_did falls back to the legacy raw hex
+ * pubkey (publicKeyFromPrivate). Compatible-superset.
+ */
+function _signerDidFor(
+  privateKeyHex: string,
+  agentId: string | undefined,
+  keyRef: string | undefined,
+): string {
+  if (agentId && keyRef) {
+    if (!agentId.startsWith('did:')) {
+      throw new Error(
+        `_signerDidFor: issuerAgentId must be a DID, got '${agentId}'`,
+      )
+    }
+    if (keyRef.includes('#')) {
+      throw new Error("_signerDidFor: issuerKeyRef must not contain '#'")
+    }
+    return `${agentId}#${keyRef}`
+  }
+  return publicKeyFromPrivate(privateKeyHex)
+}
+
 export function emitReceipt(
   input: EmitReceiptInput,
   issuerPrivateKeyHex: string,
 ): PaymentReceipt {
-  const signer_did = publicKeyFromPrivate(issuerPrivateKeyHex)
+  const signer_did = _signerDidFor(
+    issuerPrivateKeyHex,
+    input.issuer_agent_id,
+    input.issuer_key_ref,
+  )
   const issued_at = input.issued_at ?? _nowIso()
 
   const draft: PaymentReceipt = {
@@ -285,7 +322,11 @@ export function emitDenial(
       `emitDenial: denial_reason must be one of ${VALID_DENIAL_REASONS.join(' | ')}, got '${input.denial_reason}'`,
     )
   }
-  const signer_did = publicKeyFromPrivate(issuerPrivateKeyHex)
+  const signer_did = _signerDidFor(
+    issuerPrivateKeyHex,
+    input.issuer_agent_id,
+    input.issuer_key_ref,
+  )
   const issued_at = input.issued_at ?? _nowIso()
 
   const draft: PaymentDenial = {
@@ -317,12 +358,39 @@ export type ReceiptVerifyReason =
   | 'INVALID_CLAIM_TYPE'
   | 'RECEIPT_ID_MISMATCH'
   | 'SIGNATURE_INVALID'
+  | 'DID_RESOLVER_MISSING'
+  | 'DID_URI_INVALID'
+  | 'DID_DOC_NOT_FOUND'
+  | 'DID_KEY_NOT_IN_DOC'
+  | 'DID_KEY_RETIRED'
 
 export interface ReceiptVerifyResult {
   valid: boolean
   reason?: ReceiptVerifyReason
 }
 
+/** Phase 4.1 / P12: caller-supplied DID document resolver. Verifier
+ *  invokes this when `signer_did` is a DID URI; returns the agent's
+ *  RotatableDIDDocument or null when the agent is unknown. */
+export type ResolveDidDocument = (
+  agentId: string,
+) => Promise<RotatableDIDDocument | null>
+
+export interface VerifyReceiptOptions {
+  /** Required when `receipt.signer_did` is a DID URI. Omit for legacy
+   *  raw-hex receipts. */
+  resolveDidDocument?: ResolveDidDocument
+  /** Verification clock; defaults to Date.now(). */
+  now?: Date
+}
+
+/**
+ * Sync legacy verifier. Kept for backwards compatibility — receipts
+ * carrying a raw hex signer_did continue to verify here without any
+ * options. When `receipt.signer_did` is a DID URI (starts with 'did:'),
+ * this path returns DID_RESOLVER_MISSING; callers must use the async
+ * `verifyPaymentReceiptWithDID()` path with a resolveDidDocument.
+ */
 export function verifyPaymentReceipt(receipt: PaymentReceipt): ReceiptVerifyResult {
   if (receipt.claim_type !== 'aps:payment_receipt:v1') {
     return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
@@ -331,7 +399,81 @@ export function verifyPaymentReceipt(receipt: PaymentReceipt): ReceiptVerifyResu
   if (receipt.receipt_id !== expectedId) {
     return { valid: false, reason: 'RECEIPT_ID_MISMATCH' }
   }
+  if (typeof receipt.signer_did === 'string' && receipt.signer_did.startsWith('did:')) {
+    return { valid: false, reason: 'DID_RESOLVER_MISSING' }
+  }
   if (!edVerify(canonicalizeReceiptForSig(receipt), receipt.signature, receipt.signer_did)) {
+    return { valid: false, reason: 'SIGNATURE_INVALID' }
+  }
+  return { valid: true }
+}
+
+/**
+ * Phase 4.1 / P12: async verifier that resolves DID URIs against the
+ * caller-supplied DID document resolver. Falls back to the legacy
+ * raw-hex path when signer_did doesn't start with 'did:'.
+ *
+ * Failure reasons:
+ *   - DID_RESOLVER_MISSING — signer_did is a DID URI but no resolver supplied
+ *   - DID_URI_INVALID      — signer_did is malformed (no `#`, etc.)
+ *   - DID_DOC_NOT_FOUND    — resolver returned null for the agentId
+ *   - DID_KEY_NOT_IN_DOC   — keyRef not present in verificationMethod[]
+ *   - DID_KEY_RETIRED      — key was retired before the receipt was signed
+ *   - SIGNATURE_INVALID    — Ed25519 verify failed
+ */
+export async function verifyPaymentReceiptWithDID(
+  receipt: PaymentReceipt,
+  options: VerifyReceiptOptions = {},
+): Promise<ReceiptVerifyResult> {
+  if (receipt.claim_type !== 'aps:payment_receipt:v1') {
+    return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
+  }
+  const expectedId = sha256Hex(canonicalizeReceiptForId(receipt))
+  if (receipt.receipt_id !== expectedId) {
+    return { valid: false, reason: 'RECEIPT_ID_MISMATCH' }
+  }
+  const sigBytes = canonicalizeReceiptForSig(receipt)
+  return _verifyDidOrRawHex(
+    receipt.signer_did,
+    sigBytes,
+    receipt.signature,
+    receipt.issued_at,
+    options,
+  )
+}
+
+/** Shared DID-or-rawhex verification step used by all rail verifiers. */
+async function _verifyDidOrRawHex(
+  signerDid: string,
+  payload: string,
+  signature: string,
+  issuedAt: string | undefined,
+  options: VerifyReceiptOptions,
+): Promise<ReceiptVerifyResult> {
+  if (!signerDid.startsWith('did:')) {
+    if (!edVerify(payload, signature, signerDid)) {
+      return { valid: false, reason: 'SIGNATURE_INVALID' }
+    }
+    return { valid: true }
+  }
+  if (!options.resolveDidDocument) {
+    return { valid: false, reason: 'DID_RESOLVER_MISSING' }
+  }
+  const parsed = parseDidUri(signerDid)
+  if (!parsed) return { valid: false, reason: 'DID_URI_INVALID' }
+  const didDoc = await options.resolveDidDocument(parsed.agentId)
+  if (!didDoc) return { valid: false, reason: 'DID_DOC_NOT_FOUND' }
+  const issuedAtMs = issuedAt ? Date.parse(issuedAt) : undefined
+  const result = resolveVerificationMethod(
+    didDoc,
+    signerDid,
+    options.now ? options.now.getTime() : undefined,
+    Number.isFinite(issuedAtMs) ? issuedAtMs : undefined,
+  )
+  if (!result) return { valid: false, reason: 'DID_KEY_NOT_IN_DOC' }
+  if (result.retired) return { valid: false, reason: 'DID_KEY_RETIRED' }
+  const pubHex = publicKeyHexFromMethod(result.method)
+  if (!edVerify(payload, signature, pubHex)) {
     return { valid: false, reason: 'SIGNATURE_INVALID' }
   }
   return { valid: true }
@@ -342,6 +484,11 @@ export type DenialVerifyReason =
   | 'INVALID_DENIAL_REASON'
   | 'RECEIPT_ID_MISMATCH'
   | 'SIGNATURE_INVALID'
+  | 'DID_RESOLVER_MISSING'
+  | 'DID_URI_INVALID'
+  | 'DID_DOC_NOT_FOUND'
+  | 'DID_KEY_NOT_IN_DOC'
+  | 'DID_KEY_RETIRED'
 
 export interface DenialVerifyResult {
   valid: boolean
@@ -359,10 +506,37 @@ export function verifyPaymentDenial(denial: PaymentDenial): DenialVerifyResult {
   if (denial.receipt_id !== expectedId) {
     return { valid: false, reason: 'RECEIPT_ID_MISMATCH' }
   }
+  if (typeof denial.signer_did === 'string' && denial.signer_did.startsWith('did:')) {
+    return { valid: false, reason: 'DID_RESOLVER_MISSING' }
+  }
   if (!edVerify(canonicalizeDenialForSig(denial), denial.signature, denial.signer_did)) {
     return { valid: false, reason: 'SIGNATURE_INVALID' }
   }
   return { valid: true }
+}
+
+export async function verifyPaymentDenialWithDID(
+  denial: PaymentDenial,
+  options: VerifyReceiptOptions = {},
+): Promise<DenialVerifyResult> {
+  if (denial.claim_type !== 'aps:payment_denial:v1') {
+    return { valid: false, reason: 'INVALID_CLAIM_TYPE' }
+  }
+  if (!VALID_DENIAL_REASONS.includes(denial.denial_reason)) {
+    return { valid: false, reason: 'INVALID_DENIAL_REASON' }
+  }
+  const expectedId = sha256Hex(canonicalizeDenialForId(denial))
+  if (denial.receipt_id !== expectedId) {
+    return { valid: false, reason: 'RECEIPT_ID_MISMATCH' }
+  }
+  const sigBytes = canonicalizeDenialForSig(denial)
+  return _verifyDidOrRawHex(
+    denial.signer_did,
+    sigBytes,
+    denial.signature,
+    denial.issued_at,
+    options,
+  )
 }
 
 // ── Composable GovernanceHooks bundle ─────────────────────────────

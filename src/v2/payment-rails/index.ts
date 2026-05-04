@@ -51,13 +51,17 @@ export {
   emitReceipt,
   preAuthorize,
   verifyPaymentDenial,
+  verifyPaymentDenialWithDID,
   verifyPaymentReceipt,
+  verifyPaymentReceiptWithDID,
 } from './hooks.js'
 export type {
   DenialVerifyReason,
   DenialVerifyResult,
   ReceiptVerifyReason,
   ReceiptVerifyResult,
+  ResolveDidDocument,
+  VerifyReceiptOptions,
 } from './hooks.js'
 
 export {
@@ -88,6 +92,7 @@ export {
   apsToAp2PaymentMandate,
   signAp2Mandate,
   verifyAp2Mandate,
+  verifyAp2MandateWithDID,
 } from './ap2/index.js'
 
 export type {
@@ -233,7 +238,9 @@ export {
   signAcpDenial,
   signAcpReceipt,
   verifyAcpDenial,
+  verifyAcpDenialWithDID,
   verifyAcpReceipt,
+  verifyAcpReceiptWithDID,
 } from './acp/index.js'
 export type {
   AcpAllowedFromDelegation,
@@ -293,7 +300,9 @@ export {
   signMppDenial,
   signMppReceipt,
   verifyMppDenial,
+  verifyMppDenialWithDID,
   verifyMppReceipt,
+  verifyMppReceiptWithDID,
 } from './mpp/index.js'
 export type {
   MppAllowedFromDelegation,

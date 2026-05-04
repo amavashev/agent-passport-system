@@ -242,6 +242,12 @@ export interface EmitReceiptInput {
   invoice_id?: string
   /** Optional override; defaults to new Date().toISOString(). */
   issued_at?: string
+  /** Phase 4.1 / P12: when supplied alongside `issuer_key_ref`, signer_did
+   *  becomes a DID URI of the form `${issuer_agent_id}#${issuer_key_ref}`.
+   *  When either is omitted, signer_did falls back to the legacy raw hex
+   *  pubkey form (publicKeyFromPrivate). Compatible-superset. */
+  issuer_agent_id?: string
+  issuer_key_ref?: string
 }
 
 export interface EmitDenialInput {
@@ -254,6 +260,9 @@ export interface EmitDenialInput {
   reason_detail?: string
   /** Optional override; defaults to new Date().toISOString(). */
   issued_at?: string
+  /** Phase 4.1 / P12: see EmitReceiptInput.issuer_agent_id. */
+  issuer_agent_id?: string
+  issuer_key_ref?: string
 }
 
 export interface GovernanceHooks {
