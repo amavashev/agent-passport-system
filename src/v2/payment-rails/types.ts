@@ -27,7 +27,9 @@
 // ══════════════════════════════════════════════════════════════════
 
 import type { EscalationRequirement, OwnerConfirmation } from '../types.js'
+import type { ScopeOfClaim } from '../accountability/types/base.js'
 export type { EscalationRequirement, OwnerConfirmation } from '../types.js'
+export type { ScopeOfClaim } from '../accountability/types/base.js'
 
 // ── Closed taxonomies ──────────────────────────────────────────────
 
@@ -63,8 +65,33 @@ export interface PaymentInvoice {
   metadata?: Record<string, unknown>
 }
 
+/**
+ * PaymentReceipt — proof of rail event occurrence (Phase 4.1 / Q1).
+ *
+ * NEGATIVE EVIDENTIARY SEMANTIC. A PaymentReceipt proves:
+ *   - A payment instruction reached the rail under V2Delegation D
+ *   - The rail returned the recorded outcome (tx_proof anchors it)
+ *   - The instruction was canonically signed by the issuer
+ *
+ * It does NOT prove:
+ *   - The recipient earned the value
+ *     (use AttributionReceipt or DeliveryReceipt — out of scope here)
+ *   - The contribution backing the payment was valid
+ *   - Settlement is final (rails have refund / dispute / chargeback windows)
+ *   - The counterparty's legal identity is what they claim
+ *
+ * APSBundle aggregators MUST enforce this distinction: a
+ * PaymentReceipt in a bundle says "money moved on the rail," NOT
+ * "the recipient earned it."
+ *
+ * Phase 4.1 / Q1 fields (`timestamp`, `scope_of_claim`) are optional
+ * for compatible-superset migration. Receipts minted by the new
+ * `emitReceipt` path populate them; legacy receipts (no timestamp,
+ * no scope_of_claim) continue to verify under the existing path.
+ */
 export interface PaymentReceipt {
-  /** Always 'aps:payment_receipt:v1'. */
+  /** Legacy literal `'aps:payment_receipt:v1'` OR new accountability-aligned
+   *  `'rail.payment.v1'`. Verifier accepts both. */
   claim_type: string
   /** sha256 hex of canonical(receipt without signature). Content-addressed. */
   receipt_id: string
@@ -72,6 +99,14 @@ export interface PaymentReceipt {
   signer_did: string
   /** ISO 8601 UTC ms + Z. */
   issued_at: string
+  /** Phase 4.1 / Q1: alias of issued_at for AccountabilityReceiptBase
+   *  alignment. New signers populate both with identical values. Optional
+   *  for legacy compatibility. */
+  timestamp?: string
+  /** Phase 4.1 / Q1: AccountabilityReceiptBase scope-of-claim declaration.
+   *  Optional on legacy receipts; populated by the new emit path with the
+   *  rail's negative-evidentiary defaults. */
+  scope_of_claim?: ScopeOfClaim
   /** Receipt_id of the delegation that authorized this spend. */
   delegation_ref: string
   /** action_ref (Module 37 / A2A#1672 hex sha256) that the payment
@@ -92,7 +127,8 @@ export interface PaymentReceipt {
 }
 
 export interface PaymentDenial {
-  /** Always 'aps:payment_denial:v1'. */
+  /** Legacy literal `'aps:payment_denial:v1'` OR new accountability-aligned
+   *  `'rail.payment.denial.v1'`. Verifier accepts both. */
   claim_type: string
   /** sha256 hex of canonical(denial without signature). */
   receipt_id: string
@@ -100,6 +136,10 @@ export interface PaymentDenial {
   signer_did: string
   /** ISO 8601 UTC ms + Z. */
   issued_at: string
+  /** Phase 4.1 / Q1: alias of issued_at; populated by new emit path. */
+  timestamp?: string
+  /** Phase 4.1 / Q1: AccountabilityReceiptBase scope-of-claim. */
+  scope_of_claim?: ScopeOfClaim
   delegation_ref: string
   action_ref: string
   rail_name: string
@@ -242,6 +282,15 @@ export interface EmitReceiptInput {
   invoice_id?: string
   /** Optional override; defaults to new Date().toISOString(). */
   issued_at?: string
+  /** Phase 4.1 / Q1: override the rail's default scope_of_claim declaration.
+   *  When set (or accountability_shape: true), emit produces the new
+   *  AccountabilityReceiptBase-aligned shape: claim_type='rail.payment.v1',
+   *  timestamp aliases issued_at, scope_of_claim populated. When neither
+   *  is supplied, emit produces the legacy shape (byte-stable to fixtures). */
+  scope_of_claim?: ScopeOfClaim
+  /** Opt into the Phase 4.1 / Q1 accountability shape without overriding
+   *  scope_of_claim. Default false → legacy shape. */
+  accountability_shape?: boolean
 }
 
 export interface EmitDenialInput {
@@ -254,6 +303,10 @@ export interface EmitDenialInput {
   reason_detail?: string
   /** Optional override; defaults to new Date().toISOString(). */
   issued_at?: string
+  /** Phase 4.1 / Q1: override the rail's default scope_of_claim. */
+  scope_of_claim?: ScopeOfClaim
+  /** Opt into the Phase 4.1 / Q1 accountability shape. */
+  accountability_shape?: boolean
 }
 
 export interface GovernanceHooks {

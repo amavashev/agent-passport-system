@@ -658,3 +658,89 @@ test('mapMppDenialToFoundation — known-fixture mappings hold', () => {
     'requires_owner_confirmation',
   )
 })
+
+// ── Phase 4.1 / Q1 — accountability shape ─────────────────────────
+
+test('Q1: signMppReceipt with accountability_shape populates rail.mpp.v1, timestamp, scope_of_claim', () => {
+  const kp = generateKeyPair()
+  const r = signMppReceipt(
+    {
+      challenge_id: 'ch_test_001',
+      method_type: 'card',
+      amount_paid: '500',
+      currency: 'usd',
+      paid_at: new Date().toISOString(),
+      resource: 'https://api.example.com/r',
+      delegation_ref: 'del_mpp_001',
+      agent_id: 'agent-001',
+      accountability_shape: true,
+    },
+    kp.privateKey,
+  )
+  assert.equal(r.claim_type, 'rail.mpp.v1')
+  assert.equal(r.timestamp, r.issued_at)
+  assert.ok(r.scope_of_claim && r.scope_of_claim.asserts.length > 0)
+  assert.equal(verifyMppReceipt(r).valid, true)
+})
+
+test('Q1: legacy-shape MppApsReceipt still verifies', () => {
+  const kp = generateKeyPair()
+  const r = signMppReceipt(
+    {
+      challenge_id: 'ch_test_002',
+      method_type: 'card',
+      amount_paid: '500',
+      currency: 'usd',
+      paid_at: new Date().toISOString(),
+      resource: 'https://api.example.com/r',
+      agent_id: 'agent-001',
+    },
+    kp.privateKey,
+  )
+  assert.equal(r.claim_type, undefined)
+  assert.equal(verifyMppReceipt(r).valid, true)
+})
+
+test('Q1: MppApsReceipt with mismatched claim_type literal rejected', () => {
+  const kp = generateKeyPair()
+  const r = signMppReceipt(
+    {
+      challenge_id: 'ch_test_003',
+      method_type: 'card',
+      amount_paid: '500',
+      currency: 'usd',
+      paid_at: new Date().toISOString(),
+      resource: 'https://api.example.com/r',
+      agent_id: 'agent-001',
+      accountability_shape: true,
+    },
+    kp.privateKey,
+  )
+  const tampered = { ...r, claim_type: 'rail.acp.v1' as unknown as 'rail.mpp.v1' }
+  assert.equal(verifyMppReceipt(tampered).valid, false)
+})
+
+test('Q1: scope_of_claim override propagates to MppApsReceipt', () => {
+  const kp = generateKeyPair()
+  const custom = {
+    asserts: 'custom mpp claim',
+    does_not_assert: ['custom non-assertion'],
+    capture_mode: 'gateway_observed' as const,
+    completeness: 'complete' as const,
+    self_attested: false,
+  }
+  const r = signMppReceipt(
+    {
+      challenge_id: 'ch_test_004',
+      method_type: 'card',
+      amount_paid: '500',
+      currency: 'usd',
+      paid_at: new Date().toISOString(),
+      resource: 'https://api.example.com/r',
+      agent_id: 'agent-001',
+      scope_of_claim: custom,
+    },
+    kp.privateKey,
+  )
+  assert.deepEqual(r.scope_of_claim, custom)
+})

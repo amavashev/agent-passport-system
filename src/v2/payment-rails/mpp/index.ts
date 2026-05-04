@@ -365,6 +365,25 @@ export interface SignMppReceiptInput {
   resource: string
   delegation_ref?: string
   agent_id: string
+  /** Phase 4.1 / Q1: opt into AccountabilityReceiptBase shape. */
+  accountability_shape?: boolean
+  /** Override the rail's default scope_of_claim (implies accountability_shape). */
+  scope_of_claim?: import('../../accountability/types/base.js').ScopeOfClaim
+}
+
+function defaultMppReceiptScope(): import('../../accountability/types/base.js').ScopeOfClaim {
+  return {
+    asserts: 'aps:rail.mpp:authorize — an MPP 402 challenge was satisfied under the cited V2Delegation; the chosen method+currency+amount fell inside the delegation allow-list at gate time.',
+    does_not_assert: [
+      'on-chain or processor-side settlement finality',
+      'the resource served matched buyer expectations',
+      'replay was prevented (caller maintains the nonce cache)',
+      "counterparty's legal identity matches the resource URL",
+    ],
+    capture_mode: 'gateway_observed',
+    completeness: 'complete',
+    self_attested: false,
+  }
 }
 
 export function signMppReceipt(
@@ -372,6 +391,9 @@ export function signMppReceipt(
   signerPrivateKeyHex: string,
 ): MppApsReceipt {
   const signerPub = publicKeyFromPrivate(signerPrivateKeyHex)
+  const issued_at = nowIso()
+  const useAccountabilityShape =
+    input.accountability_shape === true || input.scope_of_claim !== undefined
 
   const unsigned: Omit<MppApsReceipt, 'signature'> = {
     receipt_id: `mppr_${randomUUID()}`,
@@ -386,7 +408,12 @@ export function signMppReceipt(
     delegation_ref: input.delegation_ref,
     agent_id: input.agent_id,
     signer: signerPub,
-    issued_at: nowIso(),
+    issued_at,
+  }
+  if (useAccountabilityShape) {
+    unsigned.claim_type = 'rail.mpp.v1'
+    unsigned.timestamp = issued_at
+    unsigned.scope_of_claim = input.scope_of_claim ?? defaultMppReceiptScope()
   }
 
   const sigBytes = canonicalizeJCS(unsigned)
@@ -439,6 +466,24 @@ export function verifyMppReceipt(
   const nowMs = (options.now ?? new Date()).getTime()
   if (nowMs - issuedMs > ttl * 1000) {
     return { valid: false, reason: 'EXPIRED', detail: `older than ${ttl}s` }
+  }
+
+  // Phase 4.1 / Q1: when the accountability shape is in use, enforce its
+  // invariants. Legacy receipts (no claim_type) skip this block.
+  if (receipt.claim_type !== undefined) {
+    if (receipt.claim_type !== 'rail.mpp.v1') {
+      return { valid: false, reason: 'INVALID_RECEIPT_KIND', detail: `claim_type=${receipt.claim_type}` }
+    }
+    if (receipt.timestamp !== receipt.issued_at) {
+      return { valid: false, reason: 'MISSING_REQUIRED_FIELD', detail: 'timestamp != issued_at' }
+    }
+    if (
+      !receipt.scope_of_claim ||
+      typeof receipt.scope_of_claim.asserts !== 'string' ||
+      receipt.scope_of_claim.asserts.length === 0
+    ) {
+      return { valid: false, reason: 'MISSING_REQUIRED_FIELD', detail: 'scope_of_claim' }
+    }
   }
 
   // signature verify — strip sig, canonicalize, verify

@@ -37,6 +37,9 @@
 // ══════════════════════════════════════════════════════════════════
 
 /** IETF draft pin. Bump when the upstream draft revision changes. */
+import type { ScopeOfClaim } from '../../accountability/types/base.js'
+export type { ScopeOfClaim } from '../../accountability/types/base.js'
+
 export const MPP_VERSION = 'draft-httpauth-payment-00' as const
 
 /**
@@ -159,10 +162,26 @@ export interface MppPaymentReceipt {
 }
 
 /**
- * APS-signed receipt — the audit-trail object an APS gate emits
- * after a successful 402 → 200 round-trip. Layers the canonical MPP
- * receipt fields plus delegation provenance and an Ed25519 signature
- * over the canonical-JCS bytes of every field except `signature`.
+ * MppApsReceipt — APS-signed proof of an MPP 402 → 200 round-trip (Phase 4.1 / Q1).
+ *
+ * NEGATIVE EVIDENTIARY SEMANTIC. An MppApsReceipt proves:
+ *   - An MPP 402 challenge was satisfied by an `Authorization: Payment` proof
+ *   - The chosen method_type, currency, and amount fell inside the V2Delegation's
+ *     allow-list and per-charge cap at gate time
+ *   - The resource server returned a `Payment-Receipt` header
+ *
+ * It does NOT prove:
+ *   - On-chain or processor-side settlement finality
+ *     (Tempo/Lightning preimages and card chargeback windows are out of scope)
+ *   - The resource served was what the buyer expected
+ *   - Replay was prevented (caller maintains the nonce cache)
+ *   - The counterparty's legal identity matches the resource URL
+ *
+ * APSBundle aggregators MUST treat an MppApsReceipt as evidence of "the 402
+ * was answered under delegation" — not "settlement is final."
+ *
+ * Phase 4.1 / Q1 fields (`claim_type`, `timestamp`, `scope_of_claim`) are
+ * optional for compatible-superset migration.
  */
 export interface MppApsReceipt extends MppPaymentReceipt {
   /** APS V2Delegation id; required for non-trivial settlements. */
@@ -174,6 +193,13 @@ export interface MppApsReceipt extends MppPaymentReceipt {
   issued_at: string
   /** Hex Ed25519 signature over the canonical receipt body, sig field cleared. */
   signature: string
+
+  /** Phase 4.1 / Q1: AccountabilityReceiptBase-aligned claim_type. */
+  claim_type?: 'rail.mpp.v1'
+  /** Phase 4.1 / Q1: alias of issued_at. */
+  timestamp?: string
+  /** Phase 4.1 / Q1: scope-of-claim declaration. */
+  scope_of_claim?: ScopeOfClaim
 }
 
 // ── Denial envelope ───────────────────────────────────────────────
@@ -216,6 +242,11 @@ export interface MppDenial {
   www_authenticate_error: 'invalid_request' | 'invalid_token' | 'insufficient_funds' | 'expired'
   issued_at: string
   signature: string
+
+  /** Phase 4.1 / Q1 accountability fields (optional, compatible-superset). */
+  claim_type?: 'rail.mpp.denial.v1'
+  timestamp?: string
+  scope_of_claim?: ScopeOfClaim
 }
 
 // ── Verification result types ─────────────────────────────────────

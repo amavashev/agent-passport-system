@@ -42,7 +42,33 @@ export enum RecordType {
   Withdrawal = 'Withdrawal',
   InstructionProvenanceReceipt = 'InstructionProvenanceReceipt',
   CognitiveAttestation = 'CognitiveAttestation',
+  /** Foundation rail receipt — proof of rail event, NOT economic entitlement.
+   *  See docs/governance/payment-rails-receipt-semantics.md. */
+  PaymentReceipt = 'PaymentReceipt',
+  /** ACP rail receipt — proof an ACP checkout-session op was authorized. */
+  AcpReceipt = 'AcpReceipt',
+  /** MPP rail receipt — proof an MPP 402 challenge was satisfied. */
+  MppApsReceipt = 'MppApsReceipt',
+  /** AP2 mandate — proof a mandate was issued, NOT proof of payment. */
+  SignedAP2Mandate = 'SignedAP2Mandate',
+  /** Stripe-Issuing receipt — proof the rail's webhook gate approved a card auth. */
+  StripeIssuingReceipt = 'StripeIssuingReceipt',
 }
+
+/**
+ * Canonical claim_type literal for each rail receipt's evidence-class binding.
+ * The same string is set on the rail receipt's `claim_type` field at signing
+ * time when the new accountability-aligned signing path is used. Legacy
+ * receipts (without these literals) continue to verify under the existing
+ * per-rail verifier path.
+ */
+export const RAIL_RECEIPT_CLAIM_TYPES = {
+  [RecordType.PaymentReceipt]: 'rail.payment.v1',
+  [RecordType.AcpReceipt]: 'rail.acp.v1',
+  [RecordType.MppApsReceipt]: 'rail.mpp.v1',
+  [RecordType.SignedAP2Mandate]: 'rail.ap2.mandate.v1',
+  [RecordType.StripeIssuingReceipt]: 'rail.stripe_issuing.v1',
+} as const
 
 export interface EvidenceProfile {
   required: RecordType[]

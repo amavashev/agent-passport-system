@@ -206,4 +206,8 @@ export interface StripeIssuingConfig {
   /** Allowed clock skew (seconds) for webhook signature verification.
    *  Defaults to 300 (Stripe's recommended tolerance). */
   webhookToleranceSec?: number
+  /** Phase 4.1 / Q1: opt the rail's emitted PaymentReceipt / PaymentDenial
+   *  into the AccountabilityReceiptBase-aligned shape. Default false →
+   *  legacy shape (byte-stable to fixtures). */
+  accountabilityShape?: boolean
 }

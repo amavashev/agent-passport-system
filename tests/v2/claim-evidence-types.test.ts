@@ -54,4 +54,34 @@ describe('claim-evidence-types', () => {
     assert.ok(reason && reason.length > 0)
     assert.match(reason!, /held the evidence/i)
   })
+
+  // ── Phase 4.1 / Q1 — rail receipts registered as evidence types ──
+
+  it('Q1: five rail receipt types are registered in RecordType enum', () => {
+    const expected = [
+      'PaymentReceipt',
+      'AcpReceipt',
+      'MppApsReceipt',
+      'SignedAP2Mandate',
+      'StripeIssuingReceipt',
+    ]
+    for (const name of expected) {
+      assert.ok(
+        Object.values(RecordType as unknown as Record<string, string>).includes(name),
+        `RecordType is missing ${name}`,
+      )
+    }
+  })
+
+  it('Q1: RAIL_RECEIPT_CLAIM_TYPES maps each rail receipt to its claim_type literal', async () => {
+    const { RAIL_RECEIPT_CLAIM_TYPES } = await import('../../src/v2/claim-evidence-types.js')
+    assert.equal(RAIL_RECEIPT_CLAIM_TYPES[RecordType.PaymentReceipt], 'rail.payment.v1')
+    assert.equal(RAIL_RECEIPT_CLAIM_TYPES[RecordType.AcpReceipt], 'rail.acp.v1')
+    assert.equal(RAIL_RECEIPT_CLAIM_TYPES[RecordType.MppApsReceipt], 'rail.mpp.v1')
+    assert.equal(RAIL_RECEIPT_CLAIM_TYPES[RecordType.SignedAP2Mandate], 'rail.ap2.mandate.v1')
+    assert.equal(
+      RAIL_RECEIPT_CLAIM_TYPES[RecordType.StripeIssuingReceipt],
+      'rail.stripe_issuing.v1',
+    )
+  })
 })

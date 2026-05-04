@@ -20,6 +20,9 @@
 // ══════════════════════════════════════════════════════════════════
 
 /** Pinned protocol version. Bump when the upstream schema changes. */
+import type { ScopeOfClaim } from '../../accountability/types/base.js'
+export type { ScopeOfClaim } from '../../accountability/types/base.js'
+
 export const AP2_VERSION = '0.2'
 
 // ── Shared types ──────────────────────────────────────────────────
@@ -279,6 +282,30 @@ export interface CartDetails {
 // APS audit can verify without an SD-JWT runtime. The gateway can
 // re-encode as JWS for interop with the Google reference impl.
 
+/**
+ * SignedAP2Mandate — APS-signed AP2 mandate envelope (Phase 4.1 / Q1).
+ *
+ * NEGATIVE EVIDENTIARY SEMANTIC. A SignedAP2Mandate proves:
+ *   - An AP2 mandate dict was issued and signed by the named APS signer
+ *   - The mandate's authority (cnf, iat, exp, vct) is byte-bound by the
+ *     Ed25519 signature over canonicalize_jcs(mandate)
+ *   - At signing time, the cited V2Delegation's spend cap and validity
+ *     window were honored by the construction function
+ *
+ * It does NOT prove:
+ *   - A payment occurred — a mandate is a permission, not a settlement
+ *     (see PaymentReceipt or rail-specific receipts for settlement evidence)
+ *   - The merchant accepted the mandate at the wire layer (AP2 v0.2 wire
+ *     format is SD-JWT; this APS shape is for cross-impl audit only)
+ *   - The buyer's identity is what `cnf.jwk` claims (cnf is a key, not an identity)
+ *   - Future mandate use will fall inside scope (replay is gateway product)
+ *
+ * APSBundle aggregators MUST treat a SignedAP2Mandate as evidence of "an
+ * AP2 mandate was issued under delegation" — not "payment was made."
+ *
+ * Phase 4.1 / Q1 fields (`claim_type`, `timestamp`, `scope_of_claim`) are
+ * optional for compatible-superset migration.
+ */
 export interface SignedAP2Mandate<T extends AP2Mandate = AP2Mandate> {
   /** The mandate dict, byte-identical across signing methods. */
   mandate: T
@@ -286,6 +313,13 @@ export interface SignedAP2Mandate<T extends AP2Mandate = AP2Mandate> {
   signer_did: string
   /** Ed25519 hex signature over canonicalize_jcs(mandate). */
   signature: string
+
+  /** Phase 4.1 / Q1: AccountabilityReceiptBase-aligned claim_type. */
+  claim_type?: 'rail.ap2.mandate.v1'
+  /** Phase 4.1 / Q1: ISO 8601 wall-clock alongside the mandate's iat. */
+  timestamp?: string
+  /** Phase 4.1 / Q1: scope-of-claim declaration. */
+  scope_of_claim?: ScopeOfClaim
 }
 
 // ── Mandate-verify result ─────────────────────────────────────────

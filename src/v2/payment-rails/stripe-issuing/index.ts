@@ -276,6 +276,7 @@ export class StripeIssuingRail implements PaymentRail {
       delegationLookup: config.delegationLookup,
       requiredScope: config.requiredScope,
       webhookToleranceSec: config.webhookToleranceSec,
+      accountabilityShape: config.accountabilityShape,
     }
   }
 
@@ -530,6 +531,7 @@ export class StripeIssuingRail implements PaymentRail {
         amount_base_units: args.amountStr,
         currency: args.eventCurrency,
         tx_proof: args.auth.id,
+        accountability_shape: this.config.accountabilityShape === true,
       },
       this.config.issuerPrivateKeyHex,
     )
@@ -568,6 +570,7 @@ export class StripeIssuingRail implements PaymentRail {
       amount_base_units: args.amountStr,
       currency: args.eventCurrency,
       denial_reason: args.denial_reason,
+      accountability_shape: this.config.accountabilityShape === true,
     }
     if (detail !== undefined) denialInput.reason_detail = detail
 
