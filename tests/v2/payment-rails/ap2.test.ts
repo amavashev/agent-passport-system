@@ -589,3 +589,79 @@ describe('apsToAp2*Mandate — escalation_requirements', () => {
     assert.equal(m.vct, 'mandate.checkout.open.1')
   })
 })
+
+// ── Phase 4.1 / Q1 — accountability shape ─────────────────────────
+
+describe('AP2 Q1 — accountability shape', () => {
+  const ownerKey = generateKeyPair()
+  function intent(): V2Delegation {
+    return {
+      id: 'del_ap2_q1',
+      version: 1,
+      supersedes: null,
+      supersession_justification: null,
+      delegator: 'did:aps:user',
+      delegatee: ownerKey.publicKey,
+      scope: {
+        action_categories: ['commerce.checkout'],
+        resource_limits: { 'commerce.spend_limit': 50000 },
+        constraints: {},
+      },
+      policy_context: {
+        policy_version: '2.0.0',
+        values_floor_version: '1.0.0',
+        trust_epoch: 1,
+        issuer_id: 'did:aps:user',
+        created_at: '2026-05-04T00:00:00.000Z',
+        valid_from: '2026-05-04T00:00:00.000Z',
+        valid_until: '2026-12-31T23:59:59.000Z',
+      },
+      signature: 'stub',
+      status: 'active',
+      renewal_reason: null,
+      expansion_reviewer: null,
+      expansion_review_sig: null,
+      assurance_class: 'mechanically_enforceable',
+    }
+  }
+
+  it('signAp2Mandate accountability_shape populates rail.ap2.mandate.v1, timestamp, scope_of_claim', () => {
+    const kp = generateKeyPair()
+    const m = apsToAp2IntentMandate(intent(), { currency: 'USD' })
+    const signed = signAp2Mandate(m, kp.privateKey, { accountability_shape: true })
+    assert.equal(signed.claim_type, 'rail.ap2.mandate.v1')
+    assert.equal(typeof signed.timestamp, 'string')
+    assert.ok(signed.scope_of_claim && signed.scope_of_claim.asserts.length > 0)
+    assert.equal(verifyAp2Mandate(signed).valid, true)
+  })
+
+  it('legacy-shape SignedAP2Mandate (no claim_type) still verifies', () => {
+    const kp = generateKeyPair()
+    const m = apsToAp2IntentMandate(intent(), { currency: 'USD' })
+    const signed = signAp2Mandate(m, kp.privateKey)
+    assert.equal(signed.claim_type, undefined)
+    assert.equal(verifyAp2Mandate(signed).valid, true)
+  })
+
+  it('SignedAP2Mandate with mismatched claim_type literal rejected', () => {
+    const kp = generateKeyPair()
+    const m = apsToAp2IntentMandate(intent(), { currency: 'USD' })
+    const signed = signAp2Mandate(m, kp.privateKey, { accountability_shape: true })
+    const tampered = { ...signed, claim_type: 'rail.payment.v1' as unknown as 'rail.ap2.mandate.v1' }
+    assert.equal(verifyAp2Mandate(tampered).valid, false)
+  })
+
+  it('scope_of_claim override propagates', () => {
+    const kp = generateKeyPair()
+    const m = apsToAp2IntentMandate(intent(), { currency: 'USD' })
+    const custom = {
+      asserts: 'custom ap2 claim',
+      does_not_assert: ['custom'],
+      capture_mode: 'self_attested' as const,
+      completeness: 'complete' as const,
+      self_attested: true,
+    }
+    const signed = signAp2Mandate(m, kp.privateKey, { scope_of_claim: custom })
+    assert.deepEqual(signed.scope_of_claim, custom)
+  })
+})

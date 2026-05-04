@@ -608,14 +608,49 @@ export function ap2MandateToApsDelegation(
 
 // ── Sign + verify (APS Ed25519 over RFC 8785 JCS of the dict) ──────
 
+export interface SignAp2MandateOptions {
+  /** Phase 4.1 / Q1: opt into the AccountabilityReceiptBase shape on the
+   *  outer envelope. The mandate dict itself is unchanged so the signature
+   *  remains byte-identical for legacy callers. New envelopes carry
+   *  claim_type='rail.ap2.mandate.v1', timestamp, and scope_of_claim. */
+  accountability_shape?: boolean
+  /** Override the default scope_of_claim (implies accountability_shape). */
+  scope_of_claim?: import('../../accountability/types/base.js').ScopeOfClaim
+}
+
+function defaultAp2MandateScope(): import('../../accountability/types/base.js').ScopeOfClaim {
+  return {
+    asserts: 'aps:rail.ap2:mandate — an AP2 mandate dict was issued and signed under the cited V2Delegation; the mandate authority (cnf, iat, exp, vct) is byte-bound by the Ed25519 signature.',
+    does_not_assert: [
+      'a payment occurred — a mandate is a permission, not a settlement',
+      'the merchant accepted the mandate at the wire layer (AP2 v0.2 wire format is SD-JWT)',
+      "the buyer's identity is what cnf.jwk claims (cnf is a key, not an identity)",
+      'future mandate use will fall inside scope (replay is gateway product)',
+    ],
+    capture_mode: 'self_attested',
+    completeness: 'complete',
+    self_attested: true,
+  }
+}
+
 export function signAp2Mandate<T extends AP2Mandate>(
   mandate: T,
   signerPrivateKeyHex: string,
+  options: SignAp2MandateOptions = {},
 ): SignedAP2Mandate<T> {
   const signer_did = publicKeyFromPrivate(signerPrivateKeyHex)
   const canonical = canonicalizeJCS(mandate)
   const signature = sign(canonical, signerPrivateKeyHex)
-  return { mandate, signer_did, signature }
+  const useAccountabilityShape =
+    options.accountability_shape === true || options.scope_of_claim !== undefined
+
+  const envelope: SignedAP2Mandate<T> = { mandate, signer_did, signature }
+  if (useAccountabilityShape) {
+    envelope.claim_type = 'rail.ap2.mandate.v1'
+    envelope.timestamp = new Date().toISOString()
+    envelope.scope_of_claim = options.scope_of_claim ?? defaultAp2MandateScope()
+  }
+  return envelope
 }
 
 export interface VerifyAp2MandateOptions {
@@ -698,6 +733,28 @@ export function verifyAp2Mandate(
         return { valid: false, reason: 'MISSING_REQUIRED_FIELD', detail: 'cnf' }
       }
       break
+    }
+  }
+
+  // Phase 4.1 / Q1: when the envelope opts into the accountability shape,
+  // enforce its invariants. Legacy envelopes (no claim_type) skip this.
+  if (signed.claim_type !== undefined) {
+    if (signed.claim_type !== 'rail.ap2.mandate.v1') {
+      return {
+        valid: false,
+        reason: 'MISSING_REQUIRED_FIELD',
+        detail: `claim_type=${signed.claim_type}`,
+      }
+    }
+    if (typeof signed.timestamp !== 'string' || signed.timestamp.length === 0) {
+      return { valid: false, reason: 'MISSING_REQUIRED_FIELD', detail: 'timestamp' }
+    }
+    if (
+      !signed.scope_of_claim ||
+      typeof signed.scope_of_claim.asserts !== 'string' ||
+      signed.scope_of_claim.asserts.length === 0
+    ) {
+      return { valid: false, reason: 'MISSING_REQUIRED_FIELD', detail: 'scope_of_claim' }
     }
   }
 
