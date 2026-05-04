@@ -42,7 +42,7 @@ import type {
   PaymentRail,
   VerifyTransactionResult,
 } from '../types.js'
-import type { V2Delegation } from '../../types.js'
+import type { OwnerConfirmation, V2Delegation } from '../../types.js'
 import type {
   Authorization,
   AuthorizationDecision,
@@ -123,12 +123,19 @@ function delegationToView(
     spend_limit_base_units: String(Math.floor(cents)),
     wallet_id: walletId,
     currency: apsCurrency,
+    delegator: delegation.delegator,
   }
   if (delegation.policy_context.valid_from !== undefined) {
     view.not_before = delegation.policy_context.valid_from
   }
   if (delegation.policy_context.valid_until !== undefined) {
     view.not_after = delegation.policy_context.valid_until
+  }
+  if (
+    delegation.scope.escalation_requirements !== undefined &&
+    delegation.scope.escalation_requirements.length > 0
+  ) {
+    view.escalation_requirements = delegation.scope.escalation_requirements
   }
   return view
 }
@@ -418,6 +425,16 @@ export class StripeIssuingRail implements PaymentRail {
    */
   async handleAuthorizationWebhook(
     event: AuthorizationEvent,
+    /** Optional caller-supplied escalation context. When the card's
+     *  delegation has an escalation_requirement on action_class
+     *  'commerce' with requires_owner_confirmation: true, the gateway
+     *  surfaces the OwnerConfirmation it collected from the operator
+     *  here so the rail can verify it before approving. */
+    escalation?: {
+      owner_confirmation?: OwnerConfirmation
+      action_details?: Record<string, unknown>
+      session_id?: string | null
+    },
   ): Promise<AuthorizationDecision> {
     const auth = event?.data?.object
     if (!auth || typeof auth.id !== 'string' || typeof auth.card?.id !== 'string') {
@@ -451,6 +468,10 @@ export class StripeIssuingRail implements PaymentRail {
         required_scope: this.requiredScope,
         amount_base_units: amountStr,
         currency: eventCurrency,
+        action_class: 'commerce',
+        owner_confirmation: escalation?.owner_confirmation,
+        action_details: escalation?.action_details,
+        session_id: escalation?.session_id,
       },
       this,
     )

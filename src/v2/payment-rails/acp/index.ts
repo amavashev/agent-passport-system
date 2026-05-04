@@ -28,7 +28,8 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
-import type { V2Delegation } from '../../types.js'
+import { verifyOwnerConfirmation } from '../../human-escalation.js'
+import type { OwnerConfirmation, V2Delegation } from '../../types.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
 import {
   ACP_API_VERSION,
@@ -105,6 +106,8 @@ export function apsToAcpError(reason: AcpDenialReason): {
       return { type: 'invalid_request', code: 'invalid', param: '$.status' }
     case 'api_version_mismatch':
       return { type: 'service_unavailable', code: 'invalid' }
+    case 'requires_owner_confirmation':
+      return { type: 'invalid_request', code: 'requires_sign_in' }
   }
 }
 
@@ -188,6 +191,25 @@ export type AcpPreAuthorizeResult =
   | { allow: true }
   | { allow: false; reason: AcpDenialReason; detail?: string }
 
+/** Action class ACP operations slot into for HumanEscalationFlag matching. */
+const ACP_ACTION_CLASS = 'commerce' as const
+
+export interface AcpPreAuthorizeOptions {
+  /** Owner-signed confirmation, when the delegation declares an
+   *  escalation_requirement on action_class 'commerce' with
+   *  requires_owner_confirmation: true. The gate runs the full
+   *  verifyOwnerConfirmation() chain (signer = delegator, scope
+   *  binding, expiry, signature). */
+  owner_confirmation?: OwnerConfirmation
+  /** Per-action confirmation_scope binds details_hash. ACP defaults
+   *  to hashing the canonical request body when omitted. */
+  action_details?: Record<string, unknown>
+  /** session_id for 'per_session' confirmation scope. */
+  session_id?: string | null
+  /** Caller-provided clock; defaults to Date.now() in tests/fixtures. */
+  now?: Date
+}
+
 /**
  * Decide whether a checkout-session request is permitted under a
  * delegation BEFORE the agent calls the merchant. Pure function;
@@ -199,6 +221,7 @@ export function preAuthorizeAcpCheckout(
   delegation: V2Delegation,
   /** Currency of the merchant's catalog; ACP carries this only on the response. */
   expectedCurrency?: string,
+  options: AcpPreAuthorizeOptions = {},
 ): AcpPreAuthorizeResult {
   // 1. Delegation must include a 'commerce' action category.
   const actionCategories = delegation.scope?.action_categories ?? []
@@ -212,6 +235,42 @@ export function preAuthorizeAcpCheckout(
     const expiresAt = Date.parse(validUntil)
     if (Number.isFinite(expiresAt) && Date.now() > expiresAt) {
       return { allow: false, reason: 'delegation_expired', detail: validUntil }
+    }
+  }
+
+  // 2.5. HumanEscalationFlag — Audit B P9. If the delegation declares
+  // escalation_requirements on the 'commerce' action class with
+  // requires_owner_confirmation: true, the caller MUST supply a valid
+  // OwnerConfirmation signed by delegator. Without it, deny. With an
+  // invalid one, deny too.
+  const reqs = delegation.scope?.escalation_requirements
+  const matchingReq = reqs?.find(
+    (r) => r.action_class === ACP_ACTION_CLASS && r.requires_owner_confirmation,
+  )
+  if (matchingReq) {
+    if (!options.owner_confirmation) {
+      return {
+        allow: false,
+        reason: 'requires_owner_confirmation',
+        detail: `action_class '${ACP_ACTION_CLASS}' requires owner confirmation`,
+      }
+    }
+    const verdict = verifyOwnerConfirmation(
+      options.owner_confirmation,
+      {
+        action_class: ACP_ACTION_CLASS,
+        action_details: options.action_details ?? (request as Record<string, unknown>),
+        session_id: options.session_id ?? null,
+      },
+      delegation,
+      options.now ?? new Date(),
+    )
+    if (!verdict.valid) {
+      return {
+        allow: false,
+        reason: 'requires_owner_confirmation',
+        detail: `invalid owner_confirmation: ${verdict.reason}`,
+      }
     }
   }
 

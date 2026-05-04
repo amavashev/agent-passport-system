@@ -236,6 +236,7 @@ export {
 } from './acp/index.js'
 export type {
   AcpAllowedFromDelegation,
+  AcpPreAuthorizeOptions,
   AcpPreAuthorizeResult,
   SignAcpDenialInput,
   SignAcpReceiptInput,

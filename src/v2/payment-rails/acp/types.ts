@@ -238,6 +238,7 @@ export type AcpDenialReason =
   | 'idempotency_conflict'
   | 'invalid_session_state'
   | 'api_version_mismatch'
+  | 'requires_owner_confirmation'
 
 export interface AcpDenial {
   denial_id: string

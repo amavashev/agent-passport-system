@@ -22,7 +22,15 @@ import type {
   PaymentDenial,
   PaymentReceipt,
 } from '../../../src/v2/payment-rails/index.js'
-import { publicKeyFromPrivate } from '../../../src/crypto/keys.js'
+import { generateKeyPair, publicKeyFromPrivate } from '../../../src/crypto/keys.js'
+import {
+  recordOwnerConfirmation,
+  requestOwnerConfirmation,
+} from '../../../src/v2/human-escalation.js'
+import type {
+  EscalationRequirement,
+  V2Delegation,
+} from '../../../src/v2/types.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = join(__dirname, '..', '..', '..', 'src', 'v2', 'payment-rails', 'fixtures')
@@ -345,6 +353,205 @@ describe('emitDenial + verifyPaymentDenial', () => {
         ),
       /denial_reason must be one of/,
     )
+  })
+})
+
+// ── HumanEscalationFlag — Audit B P9 ─────────────────────────────
+
+describe('preAuthorize — escalation_requirements', () => {
+  /** Build a fully-fleshed V2Delegation just to mint an OwnerConfirmation,
+   *  then project it back down into a DelegationView with escalation_requirements
+   *  + delegator populated. The fixture mirrors what the gateway-side
+   *  delegationToView() projection produces for a real V2Delegation. */
+  function _escalatedView(opts: {
+    confirmation_ttl_ms?: number
+    confirmation_scope?: EscalationRequirement['confirmation_scope']
+  } = {}) {
+    const ownerKey = generateKeyPair()
+    const requirement: EscalationRequirement = {
+      action_class: 'commerce.purchase',
+      requires_owner_confirmation: true,
+      confirmation_ttl_ms: opts.confirmation_ttl_ms ?? 5 * 60 * 1000,
+      confirmation_scope: opts.confirmation_scope ?? 'time_window',
+    }
+    const validUntil = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    const validFrom = new Date(Date.now() - 60 * 1000).toISOString()
+    const fullDelegation: V2Delegation = {
+      id: 'd'.repeat(64),
+      version: 1,
+      supersedes: null,
+      supersession_justification: null,
+      delegator: ownerKey.publicKey,
+      delegatee: 'agent-002',
+      scope: {
+        action_categories: ['commerce'],
+        escalation_requirements: [requirement],
+      },
+      policy_context: {
+        policy_version: '2.0.0',
+        values_floor_version: '1.0.0',
+        trust_epoch: 1,
+        issuer_id: ownerKey.publicKey,
+        created_at: validFrom,
+        valid_from: validFrom,
+        valid_until: validUntil,
+      },
+      signature: 'stub_signature_for_test',
+      status: 'active',
+      renewal_reason: null,
+      expansion_reviewer: null,
+      expansion_review_sig: null,
+      assurance_class: 'mechanically_enforceable',
+    }
+    const view: DelegationView = {
+      receipt_id: fullDelegation.id,
+      scope: ['commerce.purchase'],
+      spend_limit_base_units: xnoToRaw('1'),
+      wallet_id: 'wallet-test-esc-001',
+      currency: 'XNO',
+      delegator: ownerKey.publicKey,
+      escalation_requirements: [requirement],
+    }
+    return { view, fullDelegation, ownerKey }
+  }
+
+  it('no escalation_requirements: existing behavior unchanged', () => {
+    const result = preAuthorize(
+      {
+        delegation: _delegation(),
+        required_scope: 'commerce.purchase',
+        amount_base_units: xnoToRaw('0.001'),
+        currency: 'XNO',
+      },
+      _rail(),
+    )
+    assert.equal(result.ok, true)
+  })
+
+  it('escalation matches required_scope, no confirmation: denies with requires_owner_confirmation', () => {
+    const { view } = _escalatedView()
+    const result = preAuthorize(
+      {
+        delegation: view,
+        required_scope: 'commerce.purchase',
+        amount_base_units: xnoToRaw('0.001'),
+        currency: 'XNO',
+      },
+      _rail(),
+    )
+    assert.equal(result.ok, false)
+    if (result.ok) return
+    assert.equal(result.denial_reason, 'requires_owner_confirmation')
+  })
+
+  it('escalation matches, valid time_window confirmation: allows', () => {
+    const { view, fullDelegation, ownerKey } = _escalatedView()
+    const request = requestOwnerConfirmation(fullDelegation, {
+      action_class: 'commerce.purchase',
+      action_details: { kind: 'any' },
+    })
+    const confirmation = recordOwnerConfirmation({
+      request,
+      delegation: fullDelegation,
+      owner_private_key: ownerKey.privateKey,
+    })
+    const result = preAuthorize(
+      {
+        delegation: view,
+        required_scope: 'commerce.purchase',
+        amount_base_units: xnoToRaw('0.001'),
+        currency: 'XNO',
+        owner_confirmation: confirmation,
+      },
+      _rail(),
+    )
+    assert.equal(result.ok, true, `expected allow, got ${JSON.stringify(result)}`)
+  })
+
+  it('escalation matches, expired confirmation: denies', () => {
+    const { view, fullDelegation, ownerKey } = _escalatedView({ confirmation_ttl_ms: 1 })
+    const request = requestOwnerConfirmation(fullDelegation, {
+      action_class: 'commerce.purchase',
+      action_details: { kind: 'any' },
+    })
+    const confirmation = recordOwnerConfirmation({
+      request,
+      delegation: fullDelegation,
+      owner_private_key: ownerKey.privateKey,
+    })
+    const future = new Date(Date.now() + 5 * 60 * 1000)
+    const result = preAuthorize(
+      {
+        delegation: view,
+        required_scope: 'commerce.purchase',
+        amount_base_units: xnoToRaw('0.001'),
+        currency: 'XNO',
+        owner_confirmation: confirmation,
+        now: future,
+      },
+      _rail(),
+    )
+    assert.equal(result.ok, false)
+    if (result.ok) return
+    assert.equal(result.denial_reason, 'requires_owner_confirmation')
+    assert.match(result.reason_detail ?? '', /expired/)
+  })
+
+  it('escalation matches, confirmation signed by wrong key: denies', () => {
+    const { view, fullDelegation } = _escalatedView()
+    const wrongOwner = generateKeyPair()
+    const request = requestOwnerConfirmation(fullDelegation, {
+      action_class: 'commerce.purchase',
+      action_details: { kind: 'any' },
+    })
+    // Sign with the wrong key. The signed object stores confirmed_by =
+    // delegation.delegator (which is the RIGHT pubkey), but the signature
+    // comes from the wrong private key — verifyOwnerConfirmation should
+    // catch the mismatch via signature verification.
+    const confirmation = recordOwnerConfirmation({
+      request,
+      delegation: fullDelegation,
+      owner_private_key: wrongOwner.privateKey,
+    })
+    const result = preAuthorize(
+      {
+        delegation: view,
+        required_scope: 'commerce.purchase',
+        amount_base_units: xnoToRaw('0.001'),
+        currency: 'XNO',
+        owner_confirmation: confirmation,
+      },
+      _rail(),
+    )
+    assert.equal(result.ok, false)
+    if (result.ok) return
+    assert.equal(result.denial_reason, 'requires_owner_confirmation')
+  })
+
+  it('escalation requirement on different action_class: existing behavior unchanged', () => {
+    const ownerKey = generateKeyPair()
+    const view: DelegationView = {
+      ..._delegation(),
+      delegator: ownerKey.publicKey,
+      escalation_requirements: [
+        {
+          action_class: 'org_creation',
+          requires_owner_confirmation: true,
+          confirmation_ttl_ms: 5 * 60 * 1000,
+          confirmation_scope: 'time_window',
+        },
+      ],
+    }
+    const result = preAuthorize(
+      {
+        delegation: view,
+        required_scope: 'commerce.purchase',
+        amount_base_units: xnoToRaw('0.001'),
+        currency: 'XNO',
+      },
+      _rail(),
+    )
+    assert.equal(result.ok, true)
   })
 })
 

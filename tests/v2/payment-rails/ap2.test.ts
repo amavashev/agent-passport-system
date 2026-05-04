@@ -23,8 +23,12 @@ import type {
   AP2PaymentMandate,
   SignedAP2Mandate,
 } from '../../../src/v2/payment-rails/ap2/index.js'
-import { publicKeyFromPrivate } from '../../../src/crypto/keys.js'
-import type { V2Delegation } from '../../../src/v2/types.js'
+import { generateKeyPair, publicKeyFromPrivate } from '../../../src/crypto/keys.js'
+import {
+  recordOwnerConfirmation,
+  requestOwnerConfirmation,
+} from '../../../src/v2/human-escalation.js'
+import type { EscalationRequirement, V2Delegation } from '../../../src/v2/types.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = join(
@@ -391,5 +395,135 @@ describe('AP2 fixtures — byte-parity round trip', () => {
       apsOriginal.policy_context.valid_until,
     )
     assert.deepEqual(recovered.scope.action_categories, apsOriginal.scope.action_categories)
+  })
+})
+
+// ── HumanEscalationFlag — Audit B P9 ─────────────────────────────
+
+describe('apsToAp2*Mandate — escalation_requirements', () => {
+  /** Build a delegation flagged with action_class 'commerce' and a real
+   *  keypair as delegator so a matching OwnerConfirmation can be minted
+   *  via recordOwnerConfirmation. */
+  function _escalatedDelegation(opts: {
+    confirmation_ttl_ms?: number
+    confirmation_scope?: EscalationRequirement['confirmation_scope']
+  } = {}) {
+    const ownerKey = generateKeyPair()
+    const requirement: EscalationRequirement = {
+      action_class: 'commerce',
+      requires_owner_confirmation: true,
+      confirmation_ttl_ms: opts.confirmation_ttl_ms ?? 5 * 60 * 1000,
+      confirmation_scope: opts.confirmation_scope ?? 'time_window',
+    }
+    const delegation = _delegation({
+      delegator: ownerKey.publicKey,
+      scope: {
+        action_categories: ['commerce.checkout'],
+        resource_limits: { 'commerce.spend_limit': 50_000 },
+        escalation_requirements: [requirement],
+      },
+    })
+    return { delegation, ownerKey }
+  }
+
+  function _mintConfirmation(
+    delegation: V2Delegation,
+    ownerKey: ReturnType<typeof generateKeyPair>,
+    details: Record<string, unknown>,
+  ) {
+    const request = requestOwnerConfirmation(delegation, {
+      action_class: 'commerce',
+      action_details: details,
+    })
+    return recordOwnerConfirmation({
+      request,
+      delegation,
+      owner_private_key: ownerKey.privateKey,
+    })
+  }
+
+  it('apsToAp2IntentMandate: no escalation_requirements: existing behavior unchanged', () => {
+    const m = apsToAp2IntentMandate(_delegation(), { currency: 'USD' })
+    assert.equal(m.vct, 'mandate.checkout.open.1')
+  })
+
+  it('apsToAp2IntentMandate: escalation matches commerce, no confirmation: throws', () => {
+    const { delegation } = _escalatedDelegation()
+    assert.throws(
+      () => apsToAp2IntentMandate(delegation, { currency: 'USD' }),
+      /requires_owner_confirmation/,
+    )
+  })
+
+  it('apsToAp2IntentMandate: escalation matches, valid time_window confirmation: builds mandate', () => {
+    const { delegation, ownerKey } = _escalatedDelegation()
+    const confirmation = _mintConfirmation(delegation, ownerKey, { kind: 'any' })
+    const m = apsToAp2IntentMandate(delegation, {
+      currency: 'USD',
+      owner_confirmation: confirmation,
+    })
+    assert.equal(m.vct, 'mandate.checkout.open.1')
+  })
+
+  it('apsToAp2CartMandate: escalation matches, no confirmation: throws', () => {
+    const { delegation } = _escalatedDelegation()
+    assert.throws(
+      () =>
+        apsToAp2CartMandate(delegation, {
+          payee: { name: 'merchant', merchant_category_code: '5411' },
+          items: [],
+          total: { currency: 'USD', value: '10' },
+        }),
+      /requires_owner_confirmation/,
+    )
+  })
+
+  it('apsToAp2PaymentMandate: escalation matches, expired confirmation: throws', () => {
+    const { delegation, ownerKey } = _escalatedDelegation({ confirmation_ttl_ms: 1 })
+    const confirmation = _mintConfirmation(delegation, ownerKey, { kind: 'any' })
+    const future = new Date(Date.now() + 5 * 60 * 1000)
+    assert.throws(
+      () =>
+        apsToAp2PaymentMandate(delegation, {
+          payee: { name: 'merchant', merchant_category_code: '5411' },
+          payment_instrument: { type: 'card', token: 'tok_1' },
+          payment_amount: { currency: 'USD', value: '10' },
+          transaction_id: 'tx_001',
+          owner_confirmation: confirmation,
+          now: future,
+        }),
+      /invalid owner_confirmation/,
+    )
+  })
+
+  it('apsToAp2OpenPaymentMandate: escalation matches, valid confirmation: builds mandate', () => {
+    const { delegation, ownerKey } = _escalatedDelegation()
+    const confirmation = _mintConfirmation(delegation, ownerKey, { kind: 'any' })
+    const m = apsToAp2OpenPaymentMandate(delegation, {
+      currency: 'USD',
+      owner_confirmation: confirmation,
+    })
+    assert.equal(m.vct, 'mandate.payment.open.1')
+  })
+
+  it('escalation requirement on different action_class: existing behavior unchanged', () => {
+    const ownerKey = generateKeyPair()
+    const delegation = _delegation({
+      delegator: ownerKey.publicKey,
+      scope: {
+        action_categories: ['commerce.checkout'],
+        resource_limits: { 'commerce.spend_limit': 50_000 },
+        escalation_requirements: [
+          {
+            action_class: 'org_creation',
+            requires_owner_confirmation: true,
+            confirmation_ttl_ms: 5 * 60 * 1000,
+            confirmation_scope: 'time_window',
+          },
+        ],
+      },
+    })
+    const m = apsToAp2IntentMandate(delegation, { currency: 'USD' })
+    assert.equal(m.vct, 'mandate.checkout.open.1')
   })
 })

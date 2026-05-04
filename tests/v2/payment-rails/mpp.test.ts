@@ -12,12 +12,20 @@ import {
   verifyMppDenial,
   verifyMppReceipt,
 } from '../../../src/v2/payment-rails/mpp/index.js'
+import {
+  recordOwnerConfirmation,
+  requestOwnerConfirmation,
+} from '../../../src/v2/human-escalation.js'
 import type {
   MppDenialReason,
   MppMethod,
   MppPaymentChallenge,
 } from '../../../src/v2/payment-rails/mpp/types.js'
-import type { V2Delegation } from '../../../src/v2/types.js'
+import type {
+  EscalationRequirement,
+  OwnerConfirmation,
+  V2Delegation,
+} from '../../../src/v2/types.js'
 
 // ── Test helpers ──────────────────────────────────────────────────
 
@@ -27,27 +35,33 @@ function paymentDelegation(overrides: Partial<{
   allowed_currencies: string
   valid_until: string
   action_categories: string[]
+  escalation_requirements: EscalationRequirement[]
+  delegator: string
 }> = {}): V2Delegation {
   const validUntil =
     overrides.valid_until ?? new Date(Date.now() + 60 * 60 * 1000).toISOString()
   const validFrom = new Date(Date.now() - 60 * 1000).toISOString()
+  const scope: V2Delegation['scope'] = {
+    action_categories: overrides.action_categories ?? ['payment'],
+    resource_limits: {
+      spend_limit_cents: overrides.spend_limit_cents ?? 5000,
+    },
+    constraints: {
+      allowed_payment_methods: overrides.allowed_payment_methods ?? 'tempo,card',
+      allowed_currencies: overrides.allowed_currencies ?? 'usd,btc',
+    },
+  }
+  if (overrides.escalation_requirements !== undefined) {
+    scope.escalation_requirements = overrides.escalation_requirements
+  }
   return {
     id: 'del_mpp_test_001',
     version: 1,
     supersedes: null,
     supersession_justification: null,
-    delegator: 'agent-001',
+    delegator: overrides.delegator ?? 'agent-001',
     delegatee: 'agent-002',
-    scope: {
-      action_categories: overrides.action_categories ?? ['payment'],
-      resource_limits: {
-        spend_limit_cents: overrides.spend_limit_cents ?? 5000,
-      },
-      constraints: {
-        allowed_payment_methods: overrides.allowed_payment_methods ?? 'tempo,card',
-        allowed_currencies: overrides.allowed_currencies ?? 'usd,btc',
-      },
-    },
+    scope,
     policy_context: {
       policy_version: '2.0.0',
       values_floor_version: '1.0.0',
@@ -64,6 +78,39 @@ function paymentDelegation(overrides: Partial<{
     expansion_review_sig: null,
     assurance_class: 'mechanically_enforceable',
   }
+}
+
+function escalatedPaymentDelegation(
+  overrides: { confirmation_ttl_ms?: number; confirmation_scope?: EscalationRequirement['confirmation_scope'] } = {},
+): { delegation: V2Delegation; ownerKey: ReturnType<typeof generateKeyPair> } {
+  const ownerKey = generateKeyPair()
+  const requirement: EscalationRequirement = {
+    action_class: 'payment',
+    requires_owner_confirmation: true,
+    confirmation_ttl_ms: overrides.confirmation_ttl_ms ?? 5 * 60 * 1000,
+    confirmation_scope: overrides.confirmation_scope ?? 'time_window',
+  }
+  const delegation = paymentDelegation({
+    delegator: ownerKey.publicKey,
+    escalation_requirements: [requirement],
+  })
+  return { delegation, ownerKey }
+}
+
+function mintMppConfirmation(
+  delegation: V2Delegation,
+  ownerKey: ReturnType<typeof generateKeyPair>,
+  details: Record<string, unknown>,
+): OwnerConfirmation {
+  const request = requestOwnerConfirmation(delegation, {
+    action_class: 'payment',
+    action_details: details,
+  })
+  return recordOwnerConfirmation({
+    request,
+    delegation,
+    owner_private_key: ownerKey.privateKey,
+  })
 }
 
 function tempoMethod(overrides: Partial<{
@@ -246,6 +293,7 @@ test('apsToMppHttpError — every denial reason maps deterministically', () => {
     'session_replay',
     'wallet_revoked',
     'mpp_version_mismatch',
+    'requires_owner_confirmation',
   ]
   const seen = new Set<string>()
   for (const r of reasons) {
@@ -456,6 +504,7 @@ test('verifyMppDenial — every denial reason produces a verifiable denial', () 
     'session_replay',
     'wallet_revoked',
     'mpp_version_mismatch',
+    'requires_owner_confirmation',
   ]
   const kp = generateKeyPair()
   for (const r of reasons) {
@@ -470,4 +519,69 @@ test('verifyMppDenial — every denial reason produces a verifiable denial', () 
     const v = verifyMppDenial(d)
     assert.equal(v.valid, true, `denial for ${r} should verify; got ${JSON.stringify(v)}`)
   }
+})
+
+// ── HumanEscalationFlag — Audit B P9 ─────────────────────────────
+
+test('preAuthorizeMppPayment — no escalation_requirements: existing behavior unchanged', () => {
+  const r = preAuthorizeMppPayment(happyChallenge(), paymentDelegation())
+  assert.equal(r.allow, true)
+})
+
+test('preAuthorizeMppPayment — escalation matches payment, no confirmation: denies', () => {
+  const { delegation } = escalatedPaymentDelegation()
+  const r = preAuthorizeMppPayment(happyChallenge(), delegation)
+  assert.equal(r.allow, false)
+  if (r.allow === false) assert.equal(r.reason, 'requires_owner_confirmation')
+})
+
+test('preAuthorizeMppPayment — escalation matches, valid time_window confirmation: allows', () => {
+  const { delegation, ownerKey } = escalatedPaymentDelegation()
+  const confirmation = mintMppConfirmation(delegation, ownerKey, { kind: 'any' })
+  const r = preAuthorizeMppPayment(happyChallenge(), delegation, {
+    owner_confirmation: confirmation,
+  })
+  assert.equal(r.allow, true)
+})
+
+test('preAuthorizeMppPayment — escalation matches, expired confirmation: denies', () => {
+  const { delegation, ownerKey } = escalatedPaymentDelegation({ confirmation_ttl_ms: 1 })
+  const confirmation = mintMppConfirmation(delegation, ownerKey, { kind: 'any' })
+  const future = new Date(Date.now() + 5 * 60 * 1000)
+  const r = preAuthorizeMppPayment(happyChallenge({
+    expires_at: new Date(future.getTime() + 60 * 1000).toISOString(),
+  }), delegation, {
+    owner_confirmation: confirmation,
+    now: future,
+  })
+  assert.equal(r.allow, false)
+  if (r.allow === false) assert.equal(r.reason, 'requires_owner_confirmation')
+})
+
+test('preAuthorizeMppPayment — escalation matches, confirmation signed by wrong key: denies', () => {
+  const { delegation } = escalatedPaymentDelegation()
+  const wrongOwner = generateKeyPair()
+  const tamperedConf = mintMppConfirmation(delegation, wrongOwner, { kind: 'any' })
+  const r = preAuthorizeMppPayment(happyChallenge(), delegation, {
+    owner_confirmation: tamperedConf,
+  })
+  assert.equal(r.allow, false)
+  if (r.allow === false) assert.equal(r.reason, 'requires_owner_confirmation')
+})
+
+test('preAuthorizeMppPayment — escalation requirement on different action_class: existing behavior unchanged', () => {
+  const ownerKey = generateKeyPair()
+  const delegation = paymentDelegation({
+    delegator: ownerKey.publicKey,
+    escalation_requirements: [
+      {
+        action_class: 'spend_above_threshold',
+        requires_owner_confirmation: true,
+        confirmation_ttl_ms: 5 * 60 * 1000,
+        confirmation_scope: 'time_window',
+      },
+    ],
+  })
+  const r = preAuthorizeMppPayment(happyChallenge(), delegation)
+  assert.equal(r.allow, true)
 })
