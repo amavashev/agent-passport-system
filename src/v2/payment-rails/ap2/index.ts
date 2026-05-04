@@ -24,6 +24,33 @@
 import { createHash } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
+import {
+  parseDidUri,
+  publicKeyHexFromMethod,
+  resolveVerificationMethod,
+} from '../../../core/did-uri.js'
+import type { RotatableDIDDocument } from '../../../types/passport.js'
+
+export type Ap2ResolveDidDocument = (
+  agentId: string,
+) => Promise<RotatableDIDDocument | null>
+
+function _ap2SignerFor(
+  privateKeyHex: string,
+  agentId: string | undefined,
+  keyRef: string | undefined,
+): string {
+  if (agentId && keyRef) {
+    if (!agentId.startsWith('did:')) {
+      throw new Error(`signAp2Mandate: issuer_agent_id must be a DID, got '${agentId}'`)
+    }
+    if (keyRef.includes('#')) {
+      throw new Error("signAp2Mandate: issuer_key_ref must not contain '#'")
+    }
+    return `${agentId}#${keyRef}`
+  }
+  return publicKeyFromPrivate(privateKeyHex)
+}
 import { verifyOwnerConfirmation } from '../../human-escalation.js'
 import type { OwnerConfirmation, V2Delegation } from '../../types.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
@@ -616,6 +643,11 @@ export interface SignAp2MandateOptions {
   accountability_shape?: boolean
   /** Override the default scope_of_claim (implies accountability_shape). */
   scope_of_claim?: import('../../accountability/types/base.js').ScopeOfClaim
+  /** Phase 4.1 / P12: when both supplied, signer_did becomes a DID URI
+   *  of the form `${issuer_agent_id}#${issuer_key_ref}`. Otherwise the
+   *  legacy raw-hex pubkey form is used. Compatible-superset. */
+  issuer_agent_id?: string
+  issuer_key_ref?: string
 }
 
 function defaultAp2MandateScope(): import('../../accountability/types/base.js').ScopeOfClaim {
@@ -638,7 +670,11 @@ export function signAp2Mandate<T extends AP2Mandate>(
   signerPrivateKeyHex: string,
   options: SignAp2MandateOptions = {},
 ): SignedAP2Mandate<T> {
-  const signer_did = publicKeyFromPrivate(signerPrivateKeyHex)
+  const signer_did = _ap2SignerFor(
+    signerPrivateKeyHex,
+    options.issuer_agent_id,
+    options.issuer_key_ref,
+  )
   const canonical = canonicalizeJCS(mandate)
   const signature = sign(canonical, signerPrivateKeyHex)
   const useAccountabilityShape =
@@ -660,6 +696,9 @@ export interface VerifyAp2MandateOptions {
   clock_skew_seconds?: number
   /** When provided, the verifier asserts signed.signer_did === expected_signer_did. */
   expected_signer_did?: string
+  /** Phase 4.1 / P12: required when signer_did is a DID URI. The async
+   *  `verifyAp2MandateWithDID` path invokes this resolver. */
+  resolveDidDocument?: Ap2ResolveDidDocument
 }
 
 const VALID_VCTS = new Set([
@@ -760,9 +799,51 @@ export function verifyAp2Mandate(
 
   // 5. signature verify.
   const canonical = canonicalizeJCS(mandate)
+  if (typeof signer_did === 'string' && signer_did.startsWith('did:')) {
+    return {
+      valid: false,
+      reason: 'DID_RESOLVER_MISSING',
+      detail: 'use verifyAp2MandateWithDID for DID-URI signers',
+    }
+  }
   if (!edVerify(canonical, signature, signer_did)) {
     return { valid: false, reason: 'SIGNATURE_INVALID', detail: 'Ed25519 verify failed' }
   }
 
+  return { valid: true }
+}
+
+/** Phase 4.1 / P12: async mandate verifier with DID URI support. */
+export async function verifyAp2MandateWithDID(
+  signed: SignedAP2Mandate,
+  options: VerifyAp2MandateOptions = {},
+): Promise<Ap2VerifyResult> {
+  const sync = verifyAp2Mandate(signed, options)
+  if (sync.valid) return sync
+  if (sync.reason !== 'DID_RESOLVER_MISSING') return sync
+
+  if (!options.resolveDidDocument) {
+    return { valid: false, reason: 'DID_RESOLVER_MISSING' }
+  }
+  const parsed = parseDidUri(signed.signer_did)
+  if (!parsed) return { valid: false, reason: 'DID_URI_INVALID' }
+  const didDoc = await options.resolveDidDocument(parsed.agentId)
+  if (!didDoc) return { valid: false, reason: 'DID_DOC_NOT_FOUND' }
+  // AP2 mandates carry iat (Unix seconds) for the signing instant.
+  const iatSec = (signed.mandate as { iat?: number }).iat
+  const issuedAtMs = typeof iatSec === 'number' ? iatSec * 1000 : undefined
+  const result = resolveVerificationMethod(
+    didDoc,
+    signed.signer_did,
+    options.now ? options.now.getTime() : undefined,
+    issuedAtMs,
+  )
+  if (!result) return { valid: false, reason: 'DID_KEY_NOT_IN_DOC' }
+  if (result.retired) return { valid: false, reason: 'DID_KEY_RETIRED' }
+  const pubHex = publicKeyHexFromMethod(result.method)
+  const canonical = canonicalizeJCS(signed.mandate)
+  if (!edVerify(canonical, signed.signature, pubHex)) {
+    return { valid: false, reason: 'SIGNATURE_INVALID', detail: 'Ed25519 verify failed' }
+  }
   return { valid: true }
 }

@@ -210,4 +210,10 @@ export interface StripeIssuingConfig {
    *  into the AccountabilityReceiptBase-aligned shape. Default false →
    *  legacy shape (byte-stable to fixtures). */
   accountabilityShape?: boolean
+  /** Phase 4.1 / P12: when both supplied, emitted PaymentReceipt /
+   *  PaymentDenial carry signer_did = `${issuerAgentId}#${issuerKeyRef}`.
+   *  Verifiers resolve this against the agent's RotatableDIDDocument.
+   *  When either is omitted, signer_did falls back to legacy raw hex. */
+  issuerAgentId?: string
+  issuerKeyRef?: string
 }

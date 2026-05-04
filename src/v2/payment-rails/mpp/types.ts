@@ -258,6 +258,11 @@ export type MppVerifyReason =
   | 'MISSING_REQUIRED_FIELD'
   | 'SIGNATURE_INVALID'
   | 'EXPIRED'
+  | 'DID_RESOLVER_MISSING'
+  | 'DID_URI_INVALID'
+  | 'DID_DOC_NOT_FOUND'
+  | 'DID_KEY_NOT_IN_DOC'
+  | 'DID_KEY_RETIRED'
 
 export type MppVerifyResult =
   | { valid: true }

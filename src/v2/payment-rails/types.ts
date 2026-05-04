@@ -291,6 +291,12 @@ export interface EmitReceiptInput {
   /** Opt into the Phase 4.1 / Q1 accountability shape without overriding
    *  scope_of_claim. Default false → legacy shape. */
   accountability_shape?: boolean
+  /** Phase 4.1 / P12: when supplied alongside `issuer_key_ref`, signer_did
+   *  becomes a DID URI of the form `${issuer_agent_id}#${issuer_key_ref}`.
+   *  When either is omitted, signer_did falls back to the legacy raw hex
+   *  pubkey form (publicKeyFromPrivate). Compatible-superset. */
+  issuer_agent_id?: string
+  issuer_key_ref?: string
 }
 
 export interface EmitDenialInput {
@@ -307,6 +313,9 @@ export interface EmitDenialInput {
   scope_of_claim?: ScopeOfClaim
   /** Opt into the Phase 4.1 / Q1 accountability shape. */
   accountability_shape?: boolean
+  /** Phase 4.1 / P12: see EmitReceiptInput.issuer_agent_id. */
+  issuer_agent_id?: string
+  issuer_key_ref?: string
 }
 
 export interface GovernanceHooks {

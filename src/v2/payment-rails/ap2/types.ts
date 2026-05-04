@@ -330,6 +330,11 @@ export type Ap2VerifyReason =
   | 'NOT_YET_VALID'
   | 'MISSING_REQUIRED_FIELD'
   | 'SIGNATURE_INVALID'
+  | 'DID_RESOLVER_MISSING'
+  | 'DID_URI_INVALID'
+  | 'DID_DOC_NOT_FOUND'
+  | 'DID_KEY_NOT_IN_DOC'
+  | 'DID_KEY_RETIRED'
 
 export interface Ap2VerifyResult {
   valid: boolean
