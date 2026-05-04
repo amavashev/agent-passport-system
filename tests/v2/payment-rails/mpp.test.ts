@@ -5,6 +5,7 @@ import { generateKeyPair } from '../../../src/crypto/keys.js'
 import {
   apsToMppHttpError,
   delegationToMppAllowed,
+  mapMppDenialToFoundation,
   MPP_VERSION,
   preAuthorizeMppPayment,
   signMppDenial,
@@ -12,6 +13,7 @@ import {
   verifyMppDenial,
   verifyMppReceipt,
 } from '../../../src/v2/payment-rails/mpp/index.js'
+import type { DenialReason as FoundationDenialReason } from '../../../src/v2/payment-rails/types.js'
 import {
   recordOwnerConfirmation,
   requestOwnerConfirmation,
@@ -584,4 +586,75 @@ test('preAuthorizeMppPayment — escalation requirement on different action_clas
   })
   const r = preAuthorizeMppPayment(happyChallenge(), delegation)
   assert.equal(r.allow, true)
+})
+
+// ── Tier-2 → Tier-1 vocab crosswalk — Audit B P5 ─────────────────
+
+test('mapMppDenialToFoundation — every MppDenialReason maps to a foundation reason', () => {
+  const reasons: MppDenialReason[] = [
+    'spend_limit_exceeded',
+    'method_not_allowed',
+    'currency_not_allowed',
+    'delegation_expired',
+    'no_payment_scope',
+    'challenge_expired',
+    'invalid_authorization',
+    'session_replay',
+    'wallet_revoked',
+    'mpp_version_mismatch',
+    'requires_owner_confirmation',
+  ]
+  const validFoundation: FoundationDenialReason[] = [
+    'no_commerce_scope',
+    'spend_limit_exceeded',
+    'wallet_revoked',
+    'time_window_violation',
+    'rail_error',
+    'requires_owner_confirmation',
+  ]
+  for (const r of reasons) {
+    const mapped = mapMppDenialToFoundation(r)
+    assert.ok(
+      validFoundation.includes(mapped),
+      `${r} mapped to invalid foundation reason: ${mapped}`,
+    )
+  }
+})
+
+test('mapMppDenialToFoundation — deterministic (same input → same output)', () => {
+  const reasons: MppDenialReason[] = [
+    'spend_limit_exceeded',
+    'method_not_allowed',
+    'currency_not_allowed',
+    'delegation_expired',
+    'no_payment_scope',
+    'challenge_expired',
+    'invalid_authorization',
+    'session_replay',
+    'wallet_revoked',
+    'mpp_version_mismatch',
+    'requires_owner_confirmation',
+  ]
+  for (const r of reasons) {
+    const a = mapMppDenialToFoundation(r)
+    const b = mapMppDenialToFoundation(r)
+    assert.equal(a, b, `${r} not deterministic: got ${a} then ${b}`)
+  }
+})
+
+test('mapMppDenialToFoundation — known-fixture mappings hold', () => {
+  assert.equal(mapMppDenialToFoundation('spend_limit_exceeded'), 'spend_limit_exceeded')
+  assert.equal(mapMppDenialToFoundation('wallet_revoked'), 'wallet_revoked')
+  assert.equal(mapMppDenialToFoundation('no_payment_scope'), 'no_commerce_scope')
+  assert.equal(mapMppDenialToFoundation('delegation_expired'), 'time_window_violation')
+  assert.equal(mapMppDenialToFoundation('challenge_expired'), 'time_window_violation')
+  assert.equal(mapMppDenialToFoundation('method_not_allowed'), 'rail_error')
+  assert.equal(mapMppDenialToFoundation('currency_not_allowed'), 'rail_error')
+  assert.equal(mapMppDenialToFoundation('invalid_authorization'), 'rail_error')
+  assert.equal(mapMppDenialToFoundation('session_replay'), 'rail_error')
+  assert.equal(mapMppDenialToFoundation('mpp_version_mismatch'), 'rail_error')
+  assert.equal(
+    mapMppDenialToFoundation('requires_owner_confirmation'),
+    'requires_owner_confirmation',
+  )
 })

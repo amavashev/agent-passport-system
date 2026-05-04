@@ -8,12 +8,14 @@ import {
   apsToAcpError,
   checkAcpSessionUnderBudget,
   delegationToAcpAllowed,
+  mapAcpDenialToFoundation,
   preAuthorizeAcpCheckout,
   signAcpDenial,
   signAcpReceipt,
   verifyAcpDenial,
   verifyAcpReceipt,
 } from '../../../src/v2/payment-rails/acp/index.js'
+import type { DenialReason as FoundationDenialReason } from '../../../src/v2/payment-rails/types.js'
 import {
   recordOwnerConfirmation,
   requestOwnerConfirmation,
@@ -546,4 +548,75 @@ test('preAuthorizeAcpCheckout — escalation requirement on different action_cla
   }
   const r = preAuthorizeAcpCheckout(req, delegation, 'usd')
   assert.equal(r.allow, true)
+})
+
+// ── Tier-2 → Tier-1 vocab crosswalk — Audit B P5 ─────────────────
+
+test('mapAcpDenialToFoundation — every AcpDenialReason maps to a foundation reason', () => {
+  // Listing the AcpDenialReason union values literally so a future
+  // type extension that forgets to update this test fails.
+  const reasons: AcpDenialReason[] = [
+    'spend_limit_exceeded',
+    'merchant_not_allowed',
+    'delegation_expired',
+    'currency_mismatch',
+    'wallet_revoked',
+    'no_commerce_scope',
+    'idempotency_conflict',
+    'invalid_session_state',
+    'api_version_mismatch',
+    'requires_owner_confirmation',
+  ]
+  const validFoundation: FoundationDenialReason[] = [
+    'no_commerce_scope',
+    'spend_limit_exceeded',
+    'wallet_revoked',
+    'time_window_violation',
+    'rail_error',
+    'requires_owner_confirmation',
+  ]
+  for (const r of reasons) {
+    const mapped = mapAcpDenialToFoundation(r)
+    assert.ok(
+      validFoundation.includes(mapped),
+      `${r} mapped to invalid foundation reason: ${mapped}`,
+    )
+  }
+})
+
+test('mapAcpDenialToFoundation — deterministic (same input → same output)', () => {
+  const reasons: AcpDenialReason[] = [
+    'spend_limit_exceeded',
+    'merchant_not_allowed',
+    'delegation_expired',
+    'currency_mismatch',
+    'wallet_revoked',
+    'no_commerce_scope',
+    'idempotency_conflict',
+    'invalid_session_state',
+    'api_version_mismatch',
+    'requires_owner_confirmation',
+  ]
+  for (const r of reasons) {
+    const a = mapAcpDenialToFoundation(r)
+    const b = mapAcpDenialToFoundation(r)
+    assert.equal(a, b, `${r} not deterministic: got ${a} then ${b}`)
+  }
+})
+
+test('mapAcpDenialToFoundation — known-fixture mappings hold', () => {
+  // Spot-check the policy decisions documented in the vocabulary doc.
+  assert.equal(mapAcpDenialToFoundation('spend_limit_exceeded'), 'spend_limit_exceeded')
+  assert.equal(mapAcpDenialToFoundation('wallet_revoked'), 'wallet_revoked')
+  assert.equal(mapAcpDenialToFoundation('no_commerce_scope'), 'no_commerce_scope')
+  assert.equal(mapAcpDenialToFoundation('delegation_expired'), 'time_window_violation')
+  assert.equal(mapAcpDenialToFoundation('merchant_not_allowed'), 'rail_error')
+  assert.equal(mapAcpDenialToFoundation('currency_mismatch'), 'rail_error')
+  assert.equal(mapAcpDenialToFoundation('idempotency_conflict'), 'rail_error')
+  assert.equal(mapAcpDenialToFoundation('invalid_session_state'), 'rail_error')
+  assert.equal(mapAcpDenialToFoundation('api_version_mismatch'), 'rail_error')
+  assert.equal(
+    mapAcpDenialToFoundation('requires_owner_confirmation'),
+    'requires_owner_confirmation',
+  )
 })

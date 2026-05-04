@@ -31,6 +31,7 @@ import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/
 import { verifyOwnerConfirmation } from '../../human-escalation.js'
 import type { OwnerConfirmation, V2Delegation } from '../../types.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
+import type { DenialReason as FoundationDenialReason } from '../types.js'
 import {
   ACP_API_VERSION,
 } from './types.js'
@@ -108,6 +109,46 @@ export function apsToAcpError(reason: AcpDenialReason): {
       return { type: 'service_unavailable', code: 'invalid' }
     case 'requires_owner_confirmation':
       return { type: 'invalid_request', code: 'requires_sign_in' }
+  }
+}
+
+// ── Tier-2 → Tier-1 vocab crosswalk (Audit B P5) ──────────────────
+
+/**
+ * Map an ACP-specific denial reason to the foundation Tier-1
+ * DenialReason taxonomy. Generic gateways and audit-log consumers read
+ * Tier 1; rail-aware clients can keep reading Tier 2.
+ *
+ * Mapping policy (also documented in
+ * docs/governance/payment-rails-denial-vocabulary.md):
+ *   - Direct carryovers stay as themselves
+ *     (spend_limit_exceeded, wallet_revoked, no_commerce_scope)
+ *   - delegation_expired → time_window_violation
+ *     (foundation models all expiry as time-window failures)
+ *   - merchant_not_allowed / currency_mismatch / idempotency_conflict
+ *     / invalid_session_state / api_version_mismatch
+ *     / requires_owner_confirmation → rail_error
+ *     (no exact Tier-1 analog; Tier-2 carries the precise reason for
+ *     ACP-aware consumers)
+ */
+export function mapAcpDenialToFoundation(reason: AcpDenialReason): FoundationDenialReason {
+  switch (reason) {
+    case 'spend_limit_exceeded':
+      return 'spend_limit_exceeded'
+    case 'wallet_revoked':
+      return 'wallet_revoked'
+    case 'no_commerce_scope':
+      return 'no_commerce_scope'
+    case 'delegation_expired':
+      return 'time_window_violation'
+    case 'merchant_not_allowed':
+    case 'currency_mismatch':
+    case 'idempotency_conflict':
+    case 'invalid_session_state':
+    case 'api_version_mismatch':
+      return 'rail_error'
+    case 'requires_owner_confirmation':
+      return 'requires_owner_confirmation'
   }
 }
 

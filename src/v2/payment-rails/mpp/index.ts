@@ -32,6 +32,7 @@ import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/
 import { verifyOwnerConfirmation } from '../../human-escalation.js'
 import type { OwnerConfirmation, V2Delegation } from '../../types.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
+import type { DenialReason as FoundationDenialReason } from '../types.js'
 import { MPP_VERSION } from './types.js'
 export { MPP_VERSION } from './types.js'
 import type {
@@ -104,6 +105,35 @@ export function apsToMppHttpError(reason: MppDenialReason): {
       return { http_status: 503, www_authenticate_error: 'invalid_request' }
     case 'requires_owner_confirmation':
       return { http_status: 403, www_authenticate_error: 'invalid_token' }
+  }
+}
+
+// ── Tier-2 → Tier-1 vocab crosswalk (Audit B P5) ──────────────────
+
+/**
+ * Map an MPP-specific denial reason to the foundation Tier-1
+ * DenialReason taxonomy. See
+ * docs/governance/payment-rails-denial-vocabulary.md.
+ */
+export function mapMppDenialToFoundation(reason: MppDenialReason): FoundationDenialReason {
+  switch (reason) {
+    case 'spend_limit_exceeded':
+      return 'spend_limit_exceeded'
+    case 'wallet_revoked':
+      return 'wallet_revoked'
+    case 'no_payment_scope':
+      return 'no_commerce_scope'
+    case 'delegation_expired':
+    case 'challenge_expired':
+      return 'time_window_violation'
+    case 'method_not_allowed':
+    case 'currency_not_allowed':
+    case 'invalid_authorization':
+    case 'session_replay':
+    case 'mpp_version_mismatch':
+      return 'rail_error'
+    case 'requires_owner_confirmation':
+      return 'requires_owner_confirmation'
   }
 }
 
