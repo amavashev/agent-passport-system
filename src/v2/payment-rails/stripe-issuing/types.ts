@@ -206,4 +206,10 @@ export interface StripeIssuingConfig {
   /** Allowed clock skew (seconds) for webhook signature verification.
    *  Defaults to 300 (Stripe's recommended tolerance). */
   webhookToleranceSec?: number
+  /** Phase 4.1 / P12: when both supplied, emitted PaymentReceipt /
+   *  PaymentDenial carry signer_did = `${issuerAgentId}#${issuerKeyRef}`.
+   *  Verifiers resolve this against the agent's RotatableDIDDocument.
+   *  When either is omitted, signer_did falls back to legacy raw hex. */
+  issuerAgentId?: string
+  issuerKeyRef?: string
 }
