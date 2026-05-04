@@ -286,6 +286,13 @@ export interface SignedAP2Mandate<T extends AP2Mandate = AP2Mandate> {
   signer_did: string
   /** Ed25519 hex signature over canonicalize_jcs(mandate). */
   signature: string
+  /** Phase 4.1 / Q2: cross-receipt link to the AttributionReceipt this
+   *  mandate is paying against. Sits on the envelope, not the mandate
+   *  dict, so the AP2 wire-format signature stays byte-identical. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: cross-receipt link to the SettlementRecord whose
+   *  payment_obligations[] declared the payment this mandate authorizes. */
+  settlement_record_id?: string
 }
 
 // ── Mandate-verify result ─────────────────────────────────────────

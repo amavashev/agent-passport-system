@@ -380,6 +380,11 @@ export interface SignAcpReceiptInput {
   session_state: AcpCheckoutSession
   delegation_ref?: string
   agent_id: string
+  /** Phase 4.1 / Q2: link to the AttributionReceipt this op pays against. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: link to the SettlementRecord whose payment_obligations
+   *  declared this payment. */
+  settlement_record_id?: string
 }
 
 export function signAcpReceipt(
@@ -401,6 +406,12 @@ export function signAcpReceipt(
     session_state: input.session_state,
     request_digest: requestDigest,
     issued_at: nowIso(),
+  }
+  if (input.attribution_receipt_id !== undefined) {
+    unsigned.attribution_receipt_id = input.attribution_receipt_id
+  }
+  if (input.settlement_record_id !== undefined) {
+    unsigned.settlement_record_id = input.settlement_record_id
   }
 
   const sigBytes = canonicalizeJCS(unsigned)

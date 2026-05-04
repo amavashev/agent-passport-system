@@ -608,14 +608,32 @@ export function ap2MandateToApsDelegation(
 
 // ── Sign + verify (APS Ed25519 over RFC 8785 JCS of the dict) ──────
 
+export interface SignAp2MandateOptions {
+  /** Phase 4.1 / Q2: link to the AttributionReceipt this mandate is
+   *  paying against. Sits on the envelope, not the mandate dict, so
+   *  the AP2 wire-level signature stays byte-identical to legacy. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: link to the SettlementRecord whose payment_obligations
+   *  declared the payment this mandate authorizes. Envelope-side. */
+  settlement_record_id?: string
+}
+
 export function signAp2Mandate<T extends AP2Mandate>(
   mandate: T,
   signerPrivateKeyHex: string,
+  options: SignAp2MandateOptions = {},
 ): SignedAP2Mandate<T> {
   const signer_did = publicKeyFromPrivate(signerPrivateKeyHex)
   const canonical = canonicalizeJCS(mandate)
   const signature = sign(canonical, signerPrivateKeyHex)
-  return { mandate, signer_did, signature }
+  const envelope: SignedAP2Mandate<T> = { mandate, signer_did, signature }
+  if (options.attribution_receipt_id !== undefined) {
+    envelope.attribution_receipt_id = options.attribution_receipt_id
+  }
+  if (options.settlement_record_id !== undefined) {
+    envelope.settlement_record_id = options.settlement_record_id
+  }
+  return envelope
 }
 
 export interface VerifyAp2MandateOptions {

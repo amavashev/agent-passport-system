@@ -365,6 +365,12 @@ export interface SignMppReceiptInput {
   resource: string
   delegation_ref?: string
   agent_id: string
+  /** Phase 4.1 / Q2: link to the AttributionReceipt this MPP exchange
+   *  pays against. */
+  attribution_receipt_id?: string
+  /** Phase 4.1 / Q2: link to the SettlementRecord whose payment_obligations
+   *  declared this payment. */
+  settlement_record_id?: string
 }
 
 export function signMppReceipt(
@@ -387,6 +393,12 @@ export function signMppReceipt(
     agent_id: input.agent_id,
     signer: signerPub,
     issued_at: nowIso(),
+  }
+  if (input.attribution_receipt_id !== undefined) {
+    unsigned.attribution_receipt_id = input.attribution_receipt_id
+  }
+  if (input.settlement_record_id !== undefined) {
+    unsigned.settlement_record_id = input.settlement_record_id
   }
 
   const sigBytes = canonicalizeJCS(unsigned)
