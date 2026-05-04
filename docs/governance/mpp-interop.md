@@ -49,9 +49,9 @@ verifyMppDenial(denial, opts?)                         // → MppVerifyResult
 | APS `V2Delegation` field | MPP allowed envelope | Notes |
 |---|---|---|
 | `scope.action_categories` | gate input — must include `'payment'` | denial reason `no_payment_scope` if absent |
-| `scope.resource_limits.spend_limit_cents` (number) | `max_amount_per_charge` | preferred source |
-| `scope.resource_limits['payment.per_charge']` (number) | `max_amount_per_charge` | fallback |
-| `scope.constraints.spend_limit_cents` (string) | `max_amount_per_charge` | last-resort, parsed via `Number()` |
+| `scope.resource_limits.spend_limit_cents` (number) | `max_amount_per_charge` | tier-1: canonical numeric (resolver default) |
+| `scope.resource_limits['commerce.spend_limit']` (number) | `max_amount_per_charge` | tier-2: AP2-mandate alias, honored by every rail |
+| `scope.constraints.spend_limit_cents` (string) | `max_amount_per_charge` | tier-3: string fallback, parsed via `Number()` |
 | `scope.constraints.allowed_payment_methods` (CSV) | `allowed_methods` | trimmed, empty filtered |
 | `scope.constraints.allowed_currencies` (CSV) | `allowed_currencies` | trimmed, lower-cased |
 | `policy_context.valid_until` (ISO 8601) | `valid_until` | gate enforces against `options.now` |
