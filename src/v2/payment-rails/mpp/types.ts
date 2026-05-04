@@ -190,6 +190,7 @@ export type MppDenialReason =
   | 'session_replay'
   | 'wallet_revoked'
   | 'mpp_version_mismatch'
+  | 'requires_owner_confirmation'
 
 /**
  * Signed denial — the audit object emitted when APS refuses to allow

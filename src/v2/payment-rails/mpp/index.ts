@@ -29,9 +29,11 @@
 import { randomUUID } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
-import type { V2Delegation } from '../../types.js'
+import { verifyOwnerConfirmation } from '../../human-escalation.js'
+import type { OwnerConfirmation, V2Delegation } from '../../types.js'
 import { csvToList } from '../csv.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
+import type { DenialReason as FoundationDenialReason } from '../types.js'
 import { MPP_VERSION } from './types.js'
 export { MPP_VERSION } from './types.js'
 import type {
@@ -94,6 +96,37 @@ export function apsToMppHttpError(reason: MppDenialReason): {
       return { http_status: 410, www_authenticate_error: 'invalid_token' }
     case 'mpp_version_mismatch':
       return { http_status: 503, www_authenticate_error: 'invalid_request' }
+    case 'requires_owner_confirmation':
+      return { http_status: 403, www_authenticate_error: 'invalid_token' }
+  }
+}
+
+// ── Tier-2 → Tier-1 vocab crosswalk (Audit B P5) ──────────────────
+
+/**
+ * Map an MPP-specific denial reason to the foundation Tier-1
+ * DenialReason taxonomy. See
+ * docs/governance/payment-rails-denial-vocabulary.md.
+ */
+export function mapMppDenialToFoundation(reason: MppDenialReason): FoundationDenialReason {
+  switch (reason) {
+    case 'spend_limit_exceeded':
+      return 'spend_limit_exceeded'
+    case 'wallet_revoked':
+      return 'wallet_revoked'
+    case 'no_payment_scope':
+      return 'no_commerce_scope'
+    case 'delegation_expired':
+    case 'challenge_expired':
+      return 'time_window_violation'
+    case 'method_not_allowed':
+    case 'currency_not_allowed':
+    case 'invalid_authorization':
+    case 'session_replay':
+    case 'mpp_version_mismatch':
+      return 'rail_error'
+    case 'requires_owner_confirmation':
+      return 'requires_owner_confirmation'
   }
 }
 
@@ -137,6 +170,9 @@ export function delegationToMppAllowed(delegation: V2Delegation): MppAllowedFrom
 
 // ── Pre-authorization gate ────────────────────────────────────────
 
+/** Action class MPP exchanges slot into for HumanEscalationFlag matching. */
+const MPP_ACTION_CLASS = 'payment' as const
+
 export type MppPreAuthorizeResult =
   | { allow: true }
   | { allow: false; reason: MppDenialReason; detail?: string }
@@ -144,6 +180,16 @@ export type MppPreAuthorizeResult =
 export interface PreAuthorizeMppOptions {
   /** Override for deterministic tests of challenge_expired path. */
   now?: Date
+  /** Owner-signed confirmation, when the delegation declares an
+   *  escalation_requirement on action_class 'payment' with
+   *  requires_owner_confirmation: true. The gate runs the full
+   *  verifyOwnerConfirmation() chain. */
+  owner_confirmation?: OwnerConfirmation
+  /** Per-action confirmation_scope binds details_hash. MPP defaults
+   *  to hashing the canonical challenge when omitted. */
+  action_details?: Record<string, unknown>
+  /** session_id for 'per_session' confirmation scope. */
+  session_id?: string | null
 }
 
 /**
@@ -199,6 +245,41 @@ export function preAuthorizeMppPayment(
   }
 
   const nowMs = (options.now ?? new Date()).getTime()
+
+  // 1.5. HumanEscalationFlag — Audit B P9. If the delegation declares
+  // escalation_requirements on the 'payment' action class with
+  // requires_owner_confirmation: true, the caller MUST supply a valid
+  // OwnerConfirmation signed by delegator.
+  const reqs = delegation.scope?.escalation_requirements
+  const matchingReq = reqs?.find(
+    (r) => r.action_class === MPP_ACTION_CLASS && r.requires_owner_confirmation,
+  )
+  if (matchingReq) {
+    if (!options.owner_confirmation) {
+      return {
+        allow: false,
+        reason: 'requires_owner_confirmation',
+        detail: `action_class '${MPP_ACTION_CLASS}' requires owner confirmation`,
+      }
+    }
+    const verdict = verifyOwnerConfirmation(
+      options.owner_confirmation,
+      {
+        action_class: MPP_ACTION_CLASS,
+        action_details: options.action_details ?? (challenge as unknown as Record<string, unknown>),
+        session_id: options.session_id ?? null,
+      },
+      delegation,
+      options.now ?? new Date(),
+    )
+    if (!verdict.valid) {
+      return {
+        allow: false,
+        reason: 'requires_owner_confirmation',
+        detail: `invalid owner_confirmation: ${verdict.reason}`,
+      }
+    }
+  }
 
   // 2. Delegation must not be expired.
   const validUntil = delegation.policy_context?.valid_until

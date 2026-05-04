@@ -24,7 +24,8 @@
 import { createHash } from 'node:crypto'
 import { canonicalizeJCS } from '../../../core/canonical-jcs.js'
 import { publicKeyFromPrivate, sign, verify as edVerify } from '../../../crypto/keys.js'
-import type { V2Delegation } from '../../types.js'
+import { verifyOwnerConfirmation } from '../../human-escalation.js'
+import type { OwnerConfirmation, V2Delegation } from '../../types.js'
 import { resolveSpendLimitCents } from '../scope-resolution.js'
 import {
   AP2_VERSION,
@@ -152,6 +153,46 @@ function _sha256Base64Url(s: string): string {
   return createHash('sha256').update(s, 'utf8').digest('base64url')
 }
 
+/** Action class AP2 mandate construction slots into for HumanEscalationFlag. */
+const AP2_ACTION_CLASS = 'commerce' as const
+
+/** Audit B P9 — gate AP2 mandate construction on escalation_requirements.
+ *  AP2 has no denial primitive (mandates either construct or fail), so
+ *  this throws when escalation is required and not satisfied. Caller
+ *  collects the OwnerConfirmation and re-invokes the apsToAp2*Mandate
+ *  call with `owner_confirmation` populated. */
+function _assertAp2EscalationOk(
+  delegation: V2Delegation,
+  action_details: Record<string, unknown>,
+  opts: { owner_confirmation?: OwnerConfirmation; session_id?: string | null; now?: Date },
+): void {
+  const reqs = delegation.scope?.escalation_requirements
+  const matchingReq = reqs?.find(
+    (r) => r.action_class === AP2_ACTION_CLASS && r.requires_owner_confirmation,
+  )
+  if (!matchingReq) return
+  if (!opts.owner_confirmation) {
+    throw new Error(
+      `apsToAp2: action_class '${AP2_ACTION_CLASS}' requires_owner_confirmation; provide opts.owner_confirmation`,
+    )
+  }
+  const verdict = verifyOwnerConfirmation(
+    opts.owner_confirmation,
+    {
+      action_class: AP2_ACTION_CLASS,
+      action_details,
+      session_id: opts.session_id ?? null,
+    },
+    delegation,
+    opts.now ?? new Date(),
+  )
+  if (!verdict.valid) {
+    throw new Error(
+      `apsToAp2: invalid owner_confirmation: ${verdict.reason}`,
+    )
+  }
+}
+
 // ── apsToAp2IntentMandate ─────────────────────────────────────────
 
 export interface ApsToAp2IntentOptions {
@@ -166,6 +207,14 @@ export interface ApsToAp2IntentOptions {
   line_items?: AP2LineItemRequirement[]
   /** Override resource_limits key. Defaults to 'commerce.spend_limit'. */
   spend_limit_key?: string
+  /** Audit B P9 — owner confirmation when the delegation declares an
+   *  escalation_requirement on action_class 'commerce'. Required when
+   *  the requirement is set; otherwise unused. */
+  owner_confirmation?: OwnerConfirmation
+  /** session_id for 'per_session' confirmation scope. */
+  session_id?: string | null
+  /** Override clock for tests. */
+  now?: Date
 }
 
 /**
@@ -183,6 +232,16 @@ export function apsToAp2IntentMandate(
   delegation: V2Delegation,
   opts: ApsToAp2IntentOptions,
 ): AP2OpenCheckoutMandate {
+  _assertAp2EscalationOk(
+    delegation,
+    {
+      kind: 'apsToAp2IntentMandate',
+      currency: opts.currency,
+      allowed_merchants: opts.allowed_merchants,
+      line_items: opts.line_items,
+    },
+    opts,
+  )
   const constraints: AP2CheckoutConstraint[] = []
   if (opts.allowed_merchants !== undefined && opts.allowed_merchants.length > 0) {
     constraints.push({
@@ -217,6 +276,11 @@ export interface ApsToAp2CartOptions {
    *  Defaults to '' for SDK-only audit; the gateway populates this
    *  for wire-compatible mandates. */
   checkout_jwt?: string
+  /** Audit B P9 — owner confirmation when the delegation declares an
+   *  escalation_requirement on action_class 'commerce'. */
+  owner_confirmation?: OwnerConfirmation
+  session_id?: string | null
+  now?: Date
 }
 
 /**
@@ -233,6 +297,11 @@ export function apsToAp2CartMandate(
   cart: CartDetails,
   opts: ApsToAp2CartOptions = {},
 ): AP2CheckoutMandate {
+  _assertAp2EscalationOk(
+    delegation,
+    { kind: 'apsToAp2CartMandate', cart: cart as unknown as Record<string, unknown> },
+    opts,
+  )
   const checkout_jwt = opts.checkout_jwt ?? ''
   // When the caller hasn't supplied a JWT hash, derive from the empty
   // string per the schema's "sha-256 MUST be used" fallback. Real
@@ -273,12 +342,27 @@ export interface ApsToAp2PaymentOptions {
   pisp?: AP2Pisp
   execution_date?: string
   risk_data?: Record<string, unknown>
+  /** Audit B P9 — owner confirmation when the delegation declares an
+   *  escalation_requirement on action_class 'commerce'. */
+  owner_confirmation?: OwnerConfirmation
+  session_id?: string | null
+  now?: Date
 }
 
 export function apsToAp2PaymentMandate(
   delegation: V2Delegation,
   opts: ApsToAp2PaymentOptions,
 ): AP2PaymentMandate {
+  _assertAp2EscalationOk(
+    delegation,
+    {
+      kind: 'apsToAp2PaymentMandate',
+      transaction_id: opts.transaction_id,
+      payee: opts.payee as unknown as Record<string, unknown>,
+      payment_amount: opts.payment_amount as unknown as Record<string, unknown>,
+    },
+    opts,
+  )
   const mandate: AP2PaymentMandate = {
     vct: 'mandate.payment.1',
     transaction_id: opts.transaction_id,
@@ -306,12 +390,27 @@ export interface ApsToAp2OpenPaymentOptions {
   allowed_payees?: AP2Merchant[]
   allowed_payment_instruments?: AP2PaymentInstrument[]
   payment_reference?: string
+  /** Audit B P9 — owner confirmation when the delegation declares an
+   *  escalation_requirement on action_class 'commerce'. */
+  owner_confirmation?: OwnerConfirmation
+  session_id?: string | null
+  now?: Date
 }
 
 export function apsToAp2OpenPaymentMandate(
   delegation: V2Delegation,
   opts: ApsToAp2OpenPaymentOptions,
 ): AP2OpenPaymentMandate {
+  _assertAp2EscalationOk(
+    delegation,
+    {
+      kind: 'apsToAp2OpenPaymentMandate',
+      currency: opts.currency,
+      allowed_payees: opts.allowed_payees,
+      payment_reference: opts.payment_reference,
+    },
+    opts,
+  )
   const spendLimit = _spendLimitFromDelegation(delegation, opts.spend_limit_key)
   const constraints: AP2PaymentConstraint[] = [
     {

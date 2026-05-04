@@ -28,8 +28,8 @@ clients depend on. So denial vocabulary is **two-tier**.
 ## Tier 1 — foundation `DenialReason`
 
 Defined in [`src/v2/payment-rails/types.ts`](../../src/v2/payment-rails/types.ts).
-Closed union of five reasons that **every** rail's `emitDenial()`
-hook MUST be able to map a refusal into:
+Closed union that **every** rail's `emitDenial()` hook MUST be able
+to map a refusal into:
 
 ```ts
 export type DenialReason =
@@ -38,11 +38,16 @@ export type DenialReason =
   | 'wallet_revoked'
   | 'time_window_violation'
   | 'rail_error'
+  | 'requires_owner_confirmation'  // added by Audit B P9
 ```
 
 This is the contract a generic gateway, audit log, or downstream
 consumer relies on. It is the **minimum** vocabulary every rail
-implements.
+implements. `requires_owner_confirmation` was added in the Audit B
+P9 fix to surface HumanEscalationFlag denials at Tier 1 — every rail
+honors `delegation.scope.escalation_requirements` and emits this
+reason when the action class needs an OwnerConfirmation that wasn't
+supplied or didn't verify.
 
 Examples that flow through Tier 1:
 - Nano: all five reasons natively
@@ -88,6 +93,58 @@ export type MppDenialReason =
 Each Tier-2 reason MUST round-trip to a Tier-1 reason — that is the
 rail adapter's responsibility. Generic gateways read Tier 1; rail-aware
 clients can read Tier 2.
+
+## Tier-2 → Tier-1 mapping
+
+The round-trip is implemented as a pure function per rail. Audit B P5
+made it executable: prior versions of this doc described the
+round-trip in prose only.
+
+### ACP — `mapAcpDenialToFoundation()`
+
+Exported from `src/v2/payment-rails/acp/index.ts` (and re-exported
+from the package barrel). Deterministic; total over the
+`AcpDenialReason` union.
+
+| Tier-2 `AcpDenialReason` | Tier-1 `DenialReason` | Notes |
+|---|---|---|
+| `spend_limit_exceeded` | `spend_limit_exceeded` | direct carryover |
+| `wallet_revoked` | `wallet_revoked` | direct carryover |
+| `no_commerce_scope` | `no_commerce_scope` | direct carryover |
+| `delegation_expired` | `time_window_violation` | foundation models all expiry as time-window failures |
+| `merchant_not_allowed` | `rail_error` | no exact Tier-1 analog |
+| `currency_mismatch` | `rail_error` | no exact Tier-1 analog |
+| `idempotency_conflict` | `rail_error` | no exact Tier-1 analog |
+| `invalid_session_state` | `rail_error` | no exact Tier-1 analog |
+| `api_version_mismatch` | `rail_error` | no exact Tier-1 analog |
+| `requires_owner_confirmation` | `requires_owner_confirmation` | direct carryover (Audit B P9 added this Tier-1 reason) |
+
+### MPP — `mapMppDenialToFoundation()`
+
+Exported from `src/v2/payment-rails/mpp/index.ts` (and re-exported
+from the package barrel). Deterministic; total over the
+`MppDenialReason` union.
+
+| Tier-2 `MppDenialReason` | Tier-1 `DenialReason` | Notes |
+|---|---|---|
+| `spend_limit_exceeded` | `spend_limit_exceeded` | direct carryover |
+| `wallet_revoked` | `wallet_revoked` | direct carryover |
+| `no_payment_scope` | `no_commerce_scope` | semantic equivalent (MPP groups `payment` under the foundation `commerce` scope-lineage) |
+| `delegation_expired` | `time_window_violation` | foundation models all expiry as time-window failures |
+| `challenge_expired` | `time_window_violation` | same |
+| `method_not_allowed` | `rail_error` | no exact Tier-1 analog |
+| `currency_not_allowed` | `rail_error` | no exact Tier-1 analog |
+| `invalid_authorization` | `rail_error` | no exact Tier-1 analog |
+| `session_replay` | `rail_error` | no exact Tier-1 analog |
+| `mpp_version_mismatch` | `rail_error` | no exact Tier-1 analog |
+| `requires_owner_confirmation` | `requires_owner_confirmation` | direct carryover (Audit B P9 added this Tier-1 reason) |
+
+Both functions are total over their input unions. The TypeScript
+compiler enforces totality via the closed `switch` discriminator: if
+a future commit adds a Tier-2 reason without updating the mapping,
+the rail's `index.ts` fails to compile. Per-rail tests additionally
+assert the mapping is deterministic and that every union value
+produces a Tier-1 reason that exists in the foundation enum.
 
 ## What about AP2?
 

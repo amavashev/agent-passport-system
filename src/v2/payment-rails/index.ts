@@ -228,6 +228,7 @@ export {
   apsToAcpError,
   checkAcpSessionUnderBudget,
   delegationToAcpAllowed,
+  mapAcpDenialToFoundation,
   preAuthorizeAcpCheckout,
   signAcpDenial,
   signAcpReceipt,
@@ -236,6 +237,7 @@ export {
 } from './acp/index.js'
 export type {
   AcpAllowedFromDelegation,
+  AcpPreAuthorizeOptions,
   AcpPreAuthorizeResult,
   SignAcpDenialInput,
   SignAcpReceiptInput,
@@ -285,6 +287,7 @@ export type {
 export {
   apsToMppHttpError,
   delegationToMppAllowed,
+  mapMppDenialToFoundation,
   MPP_VERSION,
   preAuthorizeMppPayment,
   signMppDenial,

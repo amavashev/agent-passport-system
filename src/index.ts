@@ -1642,6 +1642,7 @@ export {
   apsToAcpError,
   checkAcpSessionUnderBudget,
   delegationToAcpAllowed,
+  mapAcpDenialToFoundation,
   preAuthorizeAcpCheckout,
   signAcpDenial,
   signAcpReceipt,
@@ -1696,6 +1697,7 @@ export type {
 export {
   apsToMppHttpError,
   delegationToMppAllowed,
+  mapMppDenialToFoundation,
   MPP_VERSION,
   preAuthorizeMppPayment,
   signMppDenial,

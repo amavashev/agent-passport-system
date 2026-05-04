@@ -15,6 +15,8 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { sign, publicKeyFromPrivate, verify as edVerify } from '../../crypto/keys.js'
+import { canonicalize } from '../../core/canonical.js'
+import { createHash } from 'node:crypto'
 import {
   canonicalizeDenialForId,
   canonicalizeDenialForSig,
@@ -23,6 +25,7 @@ import {
   sha256Hex,
 } from './canonicalize.js'
 import type {
+  DelegationView,
   DenialReason,
   EmitDenialInput,
   EmitReceiptInput,
@@ -33,6 +36,7 @@ import type {
   PreAuthorizeInput,
   PreAuthorizeResult,
 } from './types.js'
+import type { OwnerConfirmation } from '../types.js'
 
 const VALID_DENIAL_REASONS: readonly DenialReason[] = [
   'no_commerce_scope',
@@ -40,11 +44,76 @@ const VALID_DENIAL_REASONS: readonly DenialReason[] = [
   'wallet_revoked',
   'time_window_violation',
   'rail_error',
+  'requires_owner_confirmation',
 ]
 
 function _nowIso(): string {
   const d = new Date()
   return d.toISOString()
+}
+
+// ── Escalation gate (HumanEscalationFlag, Audit B P9) ─────────────
+
+/** Hash action_details exactly the way human-escalation.ts does so a
+ *  confirmation issued via recordOwnerConfirmation matches a foundation-
+ *  side per_action verification. Mirrors human-escalation.ts:39. */
+function _hashActionDetails(details: Record<string, unknown>): string {
+  return createHash('sha256').update(JSON.stringify(details)).digest('hex')
+}
+
+/** Slim verifier for the foundation gate. Mirrors the cryptographic
+ *  half of verifyOwnerConfirmation in human-escalation.ts but works
+ *  with DelegationView (no full V2Delegation): verifies signature,
+ *  delegation_id binding, action_class match, expiry, and the
+ *  scope-specific binding (per_action details hash, per_session
+ *  session_id). ACP and MPP keep using verifyOwnerConfirmation
+ *  directly because they have V2Delegation in hand. */
+type ConfirmationVerdict = { valid: true } | { valid: false; reason: string }
+
+function _verifyOwnerConfirmationAgainstView(
+  confirmation: OwnerConfirmation,
+  view: DelegationView,
+  action_class: string,
+  action_details: Record<string, unknown> | undefined,
+  session_id: string | null | undefined,
+  now: Date,
+): ConfirmationVerdict {
+  if (!view.delegator) {
+    return { valid: false, reason: 'DelegationView.delegator missing — cannot verify signature' }
+  }
+  if (confirmation.delegation_id !== view.receipt_id) {
+    return { valid: false, reason: 'delegation_id mismatch' }
+  }
+  if (confirmation.confirmed_by !== view.delegator) {
+    return { valid: false, reason: 'confirmed_by is not the delegator' }
+  }
+  if (now.getTime() > Date.parse(confirmation.expires_at)) {
+    return { valid: false, reason: 'confirmation expired' }
+  }
+  if (confirmation.action_class !== action_class) {
+    return { valid: false, reason: 'action_class mismatch' }
+  }
+  if (confirmation.confirmation_scope === 'per_action') {
+    if (action_details === undefined) {
+      return { valid: false, reason: 'per_action confirmation requires action_details on input' }
+    }
+    if (confirmation.action_details_hash !== _hashActionDetails(action_details)) {
+      return { valid: false, reason: 'per_action details hash mismatch' }
+    }
+  } else if (confirmation.confirmation_scope === 'per_session') {
+    if (!session_id || confirmation.session_id !== session_id) {
+      return { valid: false, reason: 'per_session session_id mismatch' }
+    }
+  }
+  // Signature verify — mirror bridge.ts:verifyObject exactly: strip
+  // signature, run canonicalize() (null-stripping, NOT JCS), sha256 hex,
+  // ed25519 verify.
+  const { signature, ...rest } = confirmation
+  const hash = createHash('sha256').update(canonicalize(rest)).digest('hex')
+  if (!edVerify(hash, signature, view.delegator)) {
+    return { valid: false, reason: 'signature verification failed' }
+  }
+  return { valid: true }
 }
 
 // ── preAuthorize ──────────────────────────────────────────────────
@@ -80,6 +149,42 @@ export function preAuthorize(
       ok: false,
       denial_reason: 'no_commerce_scope',
       reason_detail: `scope '${required_scope}' not in delegation`,
+    }
+  }
+
+  // HumanEscalationFlag (Audit B P9). Run before time-window and
+  // spend-limit so a flagged action surfaces the confirmation request
+  // rather than a generic denial. Caller-supplied action_class falls
+  // back to required_scope; that lets foundation rails tag scope
+  // strings ('commerce.purchase') as the action class without an extra
+  // input field.
+  const action_class = input.action_class ?? required_scope
+  const reqs = delegation.escalation_requirements
+  const matchingReq = reqs?.find(
+    (r) => r.action_class === action_class && r.requires_owner_confirmation,
+  )
+  if (matchingReq) {
+    if (!input.owner_confirmation) {
+      return {
+        ok: false,
+        denial_reason: 'requires_owner_confirmation',
+        reason_detail: `action_class '${action_class}' requires owner confirmation`,
+      }
+    }
+    const verdict = _verifyOwnerConfirmationAgainstView(
+      input.owner_confirmation,
+      delegation,
+      action_class,
+      input.action_details,
+      input.session_id ?? null,
+      input.now ?? new Date(),
+    )
+    if (!verdict.valid) {
+      return {
+        ok: false,
+        denial_reason: 'requires_owner_confirmation',
+        reason_detail: `invalid owner_confirmation: ${verdict.reason}`,
+      }
     }
   }
 

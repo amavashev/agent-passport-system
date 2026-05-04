@@ -26,6 +26,9 @@
 // the canonical signed-receipt format so audits replay across rails.
 // ══════════════════════════════════════════════════════════════════
 
+import type { EscalationRequirement, OwnerConfirmation } from '../types.js'
+export type { EscalationRequirement, OwnerConfirmation } from '../types.js'
+
 // ── Closed taxonomies ──────────────────────────────────────────────
 
 export type InvoiceStatus = 'pending' | 'confirmed' | 'expired' | 'failed'
@@ -36,6 +39,7 @@ export type DenialReason =
   | 'wallet_revoked'
   | 'time_window_violation'
   | 'rail_error'
+  | 'requires_owner_confirmation'
 
 // ── Core data shapes ───────────────────────────────────────────────
 
@@ -184,6 +188,16 @@ export interface DelegationView {
   /** Currency the spend_limit is expressed in. Must match the rail's
    *  currency at preAuthorize time. */
   currency: string
+  /** HumanEscalationFlag carry-through. When the underlying V2Delegation
+   *  declares per-action-class owner-confirmation requirements, callers
+   *  populate this on the DelegationView so the rail's preAuthorize
+   *  gate can enforce them. Foundation rails (Nano, x402, Stripe-Issuing)
+   *  read this; ACP/MPP read the full V2Delegation directly. */
+  escalation_requirements?: EscalationRequirement[]
+  /** Ed25519 hex pubkey of the delegator (the owner whose key signs
+   *  OwnerConfirmations). Required for verifying any OwnerConfirmation
+   *  attached to a PreAuthorizeInput; optional otherwise. */
+  delegator?: string
 }
 
 export interface PreAuthorizeInput {
@@ -194,6 +208,22 @@ export interface PreAuthorizeInput {
   /** Caller-provided clock for testing; defaults to Date.now() in
    *  preAuthorize when omitted. */
   now?: Date
+  /** Owner-signed confirmation, when the delegation's escalation_requirements
+   *  flag the action class as needing one. The gate verifies signer ==
+   *  delegation.delegator, action_class match, and expires_at not passed.
+   *  When the delegation has no matching escalation requirement, this is
+   *  ignored. */
+  owner_confirmation?: OwnerConfirmation
+  /** Action class to compare against escalation_requirements. Defaults
+   *  to required_scope when omitted (foundation rails treat scope strings
+   *  like 'commerce.purchase' as the action class). */
+  action_class?: string
+  /** Per-action confirmation_scope binds details_hash; passing the same
+   *  details a confirmation was issued for is required when scope is
+   *  'per_action'. Optional otherwise. */
+  action_details?: Record<string, unknown>
+  /** session_id for 'per_session' confirmation scope. */
+  session_id?: string | null
 }
 
 export type PreAuthorizeResult =

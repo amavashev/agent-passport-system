@@ -8,18 +8,28 @@ import {
   apsToAcpError,
   checkAcpSessionUnderBudget,
   delegationToAcpAllowed,
+  mapAcpDenialToFoundation,
   preAuthorizeAcpCheckout,
   signAcpDenial,
   signAcpReceipt,
   verifyAcpDenial,
   verifyAcpReceipt,
 } from '../../../src/v2/payment-rails/acp/index.js'
+import type { DenialReason as FoundationDenialReason } from '../../../src/v2/payment-rails/types.js'
+import {
+  recordOwnerConfirmation,
+  requestOwnerConfirmation,
+} from '../../../src/v2/human-escalation.js'
 import type {
   AcpCheckoutSession,
   AcpCreateCheckoutSessionRequest,
   AcpDenialReason,
 } from '../../../src/v2/payment-rails/acp/types.js'
-import type { V2Delegation } from '../../../src/v2/types.js'
+import type {
+  EscalationRequirement,
+  OwnerConfirmation,
+  V2Delegation,
+} from '../../../src/v2/types.js'
 
 // ── Test helpers ──────────────────────────────────────────────────
 
@@ -29,27 +39,34 @@ function commerceDelegation(overrides: Partial<{
   allowed_currencies: string
   valid_until: string
   action_categories: string[]
+  escalation_requirements: EscalationRequirement[]
+  delegator: string
+  id: string
 }> = {}): V2Delegation {
   const validUntil =
     overrides.valid_until ?? new Date(Date.now() + 60 * 60 * 1000).toISOString()
   const validFrom = new Date(Date.now() - 60 * 1000).toISOString()
+  const scope: V2Delegation['scope'] = {
+    action_categories: overrides.action_categories ?? ['commerce'],
+    resource_limits: {
+      spend_limit_cents: overrides.spend_limit_cents ?? 5000,
+    },
+    constraints: {
+      allowed_merchants: overrides.allowed_merchants ?? 'stripe',
+      allowed_currencies: overrides.allowed_currencies ?? 'usd',
+    },
+  }
+  if (overrides.escalation_requirements !== undefined) {
+    scope.escalation_requirements = overrides.escalation_requirements
+  }
   return {
-    id: 'del_acp_test_001',
+    id: overrides.id ?? 'del_acp_test_001',
     version: 1,
     supersedes: null,
     supersession_justification: null,
-    delegator: 'agent-001',
+    delegator: overrides.delegator ?? 'agent-001',
     delegatee: 'agent-002',
-    scope: {
-      action_categories: overrides.action_categories ?? ['commerce'],
-      resource_limits: {
-        spend_limit_cents: overrides.spend_limit_cents ?? 5000,
-      },
-      constraints: {
-        allowed_merchants: overrides.allowed_merchants ?? 'stripe',
-        allowed_currencies: overrides.allowed_currencies ?? 'usd',
-      },
-    },
+    scope,
     policy_context: {
       policy_version: '2.0.0',
       values_floor_version: '1.0.0',
@@ -66,6 +83,43 @@ function commerceDelegation(overrides: Partial<{
     expansion_review_sig: null,
     assurance_class: 'mechanically_enforceable',
   }
+}
+
+/** Build a delegation flagged for owner-confirmation on 'commerce',
+ *  paired with the keypair so a test can mint a matching OwnerConfirmation
+ *  via recordOwnerConfirmation. Uses time_window scope to avoid per-action
+ *  details-hash binding noise. */
+function escalatedCommerceDelegation(
+  overrides: { confirmation_ttl_ms?: number; confirmation_scope?: EscalationRequirement['confirmation_scope'] } = {},
+): { delegation: V2Delegation; ownerKey: ReturnType<typeof generateKeyPair> } {
+  const ownerKey = generateKeyPair()
+  const requirement: EscalationRequirement = {
+    action_class: 'commerce',
+    requires_owner_confirmation: true,
+    confirmation_ttl_ms: overrides.confirmation_ttl_ms ?? 5 * 60 * 1000,
+    confirmation_scope: overrides.confirmation_scope ?? 'time_window',
+  }
+  const delegation = commerceDelegation({
+    delegator: ownerKey.publicKey,
+    escalation_requirements: [requirement],
+  })
+  return { delegation, ownerKey }
+}
+
+function mintConfirmation(
+  delegation: V2Delegation,
+  ownerKey: ReturnType<typeof generateKeyPair>,
+  details: Record<string, unknown>,
+): OwnerConfirmation {
+  const request = requestOwnerConfirmation(delegation, {
+    action_class: 'commerce',
+    action_details: details,
+  })
+  return recordOwnerConfirmation({
+    request,
+    delegation,
+    owner_private_key: ownerKey.privateKey,
+  })
 }
 
 function happySession(overrides: Partial<AcpCheckoutSession> = {}): AcpCheckoutSession {
@@ -225,6 +279,7 @@ test('apsToAcpError — every denial reason maps deterministically', () => {
     'idempotency_conflict',
     'invalid_session_state',
     'api_version_mismatch',
+    'requires_owner_confirmation',
   ]
   const seen = new Set<string>()
   for (const r of reasons) {
@@ -390,6 +445,7 @@ test('verifyAcpDenial — every denial reason produces a verifiable denial', () 
     'idempotency_conflict',
     'invalid_session_state',
     'api_version_mismatch',
+    'requires_owner_confirmation',
   ]
   const kp = generateKeyPair()
   for (const r of reasons) {
@@ -406,4 +462,161 @@ test('verifyAcpDenial — every denial reason produces a verifiable denial', () 
     const v = verifyAcpDenial(d)
     assert.equal(v.valid, true, `denial for ${r} should verify; got ${JSON.stringify(v)}`)
   }
+})
+
+// ── HumanEscalationFlag — Audit B P9 ─────────────────────────────
+
+test('preAuthorizeAcpCheckout — no escalation_requirements: existing behavior unchanged', () => {
+  const d = commerceDelegation()
+  const req: AcpCreateCheckoutSessionRequest = {
+    items: [{ id: 'item_1', quantity: 1 }],
+  }
+  const r = preAuthorizeAcpCheckout(req, d, 'usd')
+  assert.equal(r.allow, true)
+})
+
+test('preAuthorizeAcpCheckout — escalation matches commerce, no confirmation: denies', () => {
+  const { delegation } = escalatedCommerceDelegation()
+  const req: AcpCreateCheckoutSessionRequest = {
+    items: [{ id: 'item_1', quantity: 1 }],
+  }
+  const r = preAuthorizeAcpCheckout(req, delegation, 'usd')
+  assert.equal(r.allow, false)
+  if (r.allow === false) assert.equal(r.reason, 'requires_owner_confirmation')
+})
+
+test('preAuthorizeAcpCheckout — escalation matches, valid time_window confirmation: allows', () => {
+  const { delegation, ownerKey } = escalatedCommerceDelegation()
+  const req: AcpCreateCheckoutSessionRequest = {
+    items: [{ id: 'item_1', quantity: 1 }],
+  }
+  const confirmation = mintConfirmation(delegation, ownerKey, { kind: 'any' })
+  const r = preAuthorizeAcpCheckout(req, delegation, 'usd', {
+    owner_confirmation: confirmation,
+  })
+  assert.equal(r.allow, true)
+})
+
+test('preAuthorizeAcpCheckout — escalation matches, expired confirmation: denies', () => {
+  const { delegation, ownerKey } = escalatedCommerceDelegation({ confirmation_ttl_ms: 1 })
+  const req: AcpCreateCheckoutSessionRequest = {
+    items: [{ id: 'item_1', quantity: 1 }],
+  }
+  const confirmation = mintConfirmation(delegation, ownerKey, { kind: 'any' })
+  // Roll the gate clock 5 minutes forward so the 1ms-TTL confirmation is expired.
+  const future = new Date(Date.now() + 5 * 60 * 1000)
+  const r = preAuthorizeAcpCheckout(req, delegation, 'usd', {
+    owner_confirmation: confirmation,
+    now: future,
+  })
+  assert.equal(r.allow, false)
+  if (r.allow === false) assert.equal(r.reason, 'requires_owner_confirmation')
+})
+
+test('preAuthorizeAcpCheckout — escalation matches, confirmation signed by wrong key: denies', () => {
+  const { delegation } = escalatedCommerceDelegation()
+  const wrongOwner = generateKeyPair()
+  // Mint a confirmation against the same delegation but signed by a key
+  // that is NOT delegator.
+  const tamperedConf = mintConfirmation(delegation, wrongOwner, { kind: 'any' })
+  const req: AcpCreateCheckoutSessionRequest = {
+    items: [{ id: 'item_1', quantity: 1 }],
+  }
+  const r = preAuthorizeAcpCheckout(req, delegation, 'usd', {
+    owner_confirmation: tamperedConf,
+  })
+  assert.equal(r.allow, false)
+  if (r.allow === false) assert.equal(r.reason, 'requires_owner_confirmation')
+})
+
+test('preAuthorizeAcpCheckout — escalation requirement on different action_class: existing behavior unchanged', () => {
+  // Delegation flags 'org_creation' for confirmation but not 'commerce'.
+  const ownerKey = generateKeyPair()
+  const delegation = commerceDelegation({
+    delegator: ownerKey.publicKey,
+    escalation_requirements: [
+      {
+        action_class: 'org_creation',
+        requires_owner_confirmation: true,
+        confirmation_ttl_ms: 5 * 60 * 1000,
+        confirmation_scope: 'time_window',
+      },
+    ],
+  })
+  const req: AcpCreateCheckoutSessionRequest = {
+    items: [{ id: 'item_1', quantity: 1 }],
+  }
+  const r = preAuthorizeAcpCheckout(req, delegation, 'usd')
+  assert.equal(r.allow, true)
+})
+
+// ── Tier-2 → Tier-1 vocab crosswalk — Audit B P5 ─────────────────
+
+test('mapAcpDenialToFoundation — every AcpDenialReason maps to a foundation reason', () => {
+  // Listing the AcpDenialReason union values literally so a future
+  // type extension that forgets to update this test fails.
+  const reasons: AcpDenialReason[] = [
+    'spend_limit_exceeded',
+    'merchant_not_allowed',
+    'delegation_expired',
+    'currency_mismatch',
+    'wallet_revoked',
+    'no_commerce_scope',
+    'idempotency_conflict',
+    'invalid_session_state',
+    'api_version_mismatch',
+    'requires_owner_confirmation',
+  ]
+  const validFoundation: FoundationDenialReason[] = [
+    'no_commerce_scope',
+    'spend_limit_exceeded',
+    'wallet_revoked',
+    'time_window_violation',
+    'rail_error',
+    'requires_owner_confirmation',
+  ]
+  for (const r of reasons) {
+    const mapped = mapAcpDenialToFoundation(r)
+    assert.ok(
+      validFoundation.includes(mapped),
+      `${r} mapped to invalid foundation reason: ${mapped}`,
+    )
+  }
+})
+
+test('mapAcpDenialToFoundation — deterministic (same input → same output)', () => {
+  const reasons: AcpDenialReason[] = [
+    'spend_limit_exceeded',
+    'merchant_not_allowed',
+    'delegation_expired',
+    'currency_mismatch',
+    'wallet_revoked',
+    'no_commerce_scope',
+    'idempotency_conflict',
+    'invalid_session_state',
+    'api_version_mismatch',
+    'requires_owner_confirmation',
+  ]
+  for (const r of reasons) {
+    const a = mapAcpDenialToFoundation(r)
+    const b = mapAcpDenialToFoundation(r)
+    assert.equal(a, b, `${r} not deterministic: got ${a} then ${b}`)
+  }
+})
+
+test('mapAcpDenialToFoundation — known-fixture mappings hold', () => {
+  // Spot-check the policy decisions documented in the vocabulary doc.
+  assert.equal(mapAcpDenialToFoundation('spend_limit_exceeded'), 'spend_limit_exceeded')
+  assert.equal(mapAcpDenialToFoundation('wallet_revoked'), 'wallet_revoked')
+  assert.equal(mapAcpDenialToFoundation('no_commerce_scope'), 'no_commerce_scope')
+  assert.equal(mapAcpDenialToFoundation('delegation_expired'), 'time_window_violation')
+  assert.equal(mapAcpDenialToFoundation('merchant_not_allowed'), 'rail_error')
+  assert.equal(mapAcpDenialToFoundation('currency_mismatch'), 'rail_error')
+  assert.equal(mapAcpDenialToFoundation('idempotency_conflict'), 'rail_error')
+  assert.equal(mapAcpDenialToFoundation('invalid_session_state'), 'rail_error')
+  assert.equal(mapAcpDenialToFoundation('api_version_mismatch'), 'rail_error')
+  assert.equal(
+    mapAcpDenialToFoundation('requires_owner_confirmation'),
+    'requires_owner_confirmation',
+  )
 })

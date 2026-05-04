@@ -31,7 +31,11 @@ import {
   verifyPaymentReceipt,
 } from '../../../src/v2/payment-rails/index.js'
 import { generateKeyPair } from '../../../src/crypto/keys.js'
-import type { V2Delegation } from '../../../src/v2/types.js'
+import {
+  recordOwnerConfirmation,
+  requestOwnerConfirmation,
+} from '../../../src/v2/human-escalation.js'
+import type { EscalationRequirement, V2Delegation } from '../../../src/v2/types.js'
 
 // ── Test fixtures ─────────────────────────────────────────────────
 
@@ -542,6 +546,214 @@ describe('StripeIssuingRail — handleAuthorizationWebhook (decline paths)', () 
     assert.equal(decision.reason, 'rail_error')
     assert.match(decision.denial?.reason_detail ?? '', /no delegation registered/)
     assert.ok(calls[0]!.url.endsWith('/decline'))
+  })
+})
+
+// ── HumanEscalationFlag — Audit B P9 ─────────────────────────────
+
+describe('StripeIssuingRail — handleAuthorizationWebhook (escalation)', () => {
+  /** Build a synthetic V2Delegation that pairs with a real ownerKey so a
+   *  matching OwnerConfirmation can be minted, plus the corresponding
+   *  DelegationView shape Stripe-Issuing wants. */
+  function _escalatedSetup(opts: {
+    confirmation_ttl_ms?: number
+    confirmation_scope?: EscalationRequirement['confirmation_scope']
+  } = {}) {
+    const ownerKey = generateKeyPair()
+    const requirement: EscalationRequirement = {
+      action_class: 'commerce',
+      requires_owner_confirmation: true,
+      confirmation_ttl_ms: opts.confirmation_ttl_ms ?? 5 * 60 * 1000,
+      confirmation_scope: opts.confirmation_scope ?? 'time_window',
+    }
+    const fullDelegation: V2Delegation = {
+      id: 'deleg-esc-001',
+      version: 1,
+      supersedes: null,
+      supersession_justification: null,
+      delegator: ownerKey.publicKey,
+      delegatee: 'agent-002',
+      scope: {
+        action_categories: ['commerce.purchase', 'commerce'],
+        escalation_requirements: [requirement],
+      },
+      policy_context: {
+        policy_version: '2.0.0',
+        values_floor_version: '1.0.0',
+        trust_epoch: 1,
+        issuer_id: ownerKey.publicKey,
+        created_at: new Date(Date.now() - 60_000).toISOString(),
+        valid_from: new Date(Date.now() - 60_000).toISOString(),
+        valid_until: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      },
+      signature: 'stub_signature_for_test',
+      status: 'active',
+      renewal_reason: null,
+      expansion_reviewer: null,
+      expansion_review_sig: null,
+      assurance_class: 'mechanically_enforceable',
+    }
+    return { ownerKey, fullDelegation, requirement }
+  }
+
+  it('flagged delegation, no owner_confirmation: declines with requires_owner_confirmation', async () => {
+    const { fetch, calls } = makeMockFetch({
+      fallback: () => ({ body: { id: 'iauth_esc_noconf_001', status: 'closed' } }),
+    })
+    const rail = createStripeIssuingRail({
+      apiKey: TEST_KEY,
+      issuerPrivateKeyHex: ISSUER_PRIV,
+      fetch,
+    })
+    const { fullDelegation, requirement } = _escalatedSetup()
+    rail.registerCardDelegation('ic_card_esc', {
+      receipt_id: fullDelegation.id,
+      scope: ['commerce.purchase'],
+      spend_limit_base_units: '5000',
+      currency: 'USD',
+      wallet_id: 'ic_card_esc',
+      delegator: fullDelegation.delegator,
+      escalation_requirements: [requirement],
+    })
+
+    const event = sampleAuthorizationEvent({
+      cardId: 'ic_card_esc',
+      amountCents: 1000,
+      authId: 'iauth_esc_noconf_001',
+    })
+    const decision = await rail.handleAuthorizationWebhook(event)
+    assert.equal(decision.approved, false)
+    assert.equal(decision.reason, 'requires_owner_confirmation')
+    const v = verifyPaymentDenial(decision.denial!)
+    assert.equal(v.valid, true, JSON.stringify(v))
+    assert.ok(calls[0]!.url.endsWith('/decline'))
+  })
+
+  it('flagged delegation, valid owner_confirmation: approves and emits receipt', async () => {
+    const { fetch, calls } = makeMockFetch({
+      fallback: ({ url }) => ({
+        body: { id: url.split('/').slice(-2, -1)[0] ?? 'iauth_x', status: 'pending' },
+      }),
+    })
+    const rail = createStripeIssuingRail({
+      apiKey: TEST_KEY,
+      issuerPrivateKeyHex: ISSUER_PRIV,
+      fetch,
+    })
+    const { fullDelegation, ownerKey, requirement } = _escalatedSetup()
+    rail.registerCardDelegation('ic_card_esc_ok', {
+      receipt_id: fullDelegation.id,
+      scope: ['commerce.purchase'],
+      spend_limit_base_units: '5000',
+      currency: 'USD',
+      wallet_id: 'ic_card_esc_ok',
+      delegator: fullDelegation.delegator,
+      escalation_requirements: [requirement],
+    })
+
+    const request = requestOwnerConfirmation(fullDelegation, {
+      action_class: 'commerce',
+      action_details: { kind: 'any' },
+    })
+    const confirmation = recordOwnerConfirmation({
+      request,
+      delegation: fullDelegation,
+      owner_private_key: ownerKey.privateKey,
+    })
+
+    const event = sampleAuthorizationEvent({
+      cardId: 'ic_card_esc_ok',
+      amountCents: 1000,
+      authId: 'iauth_esc_ok_001',
+    })
+    const decision = await rail.handleAuthorizationWebhook(event, {
+      owner_confirmation: confirmation,
+    })
+    assert.equal(decision.approved, true, JSON.stringify(decision))
+    assert.ok(decision.receipt)
+    const v = verifyPaymentReceipt(decision.receipt!)
+    assert.equal(v.valid, true, JSON.stringify(v))
+    assert.ok(calls[0]!.url.endsWith('/approve'))
+  })
+
+  it('flagged delegation, invalid owner_confirmation (wrong key): declines', async () => {
+    const { fetch } = makeMockFetch({
+      fallback: () => ({ body: { id: 'iauth_esc_bad_001', status: 'closed' } }),
+    })
+    const rail = createStripeIssuingRail({
+      apiKey: TEST_KEY,
+      issuerPrivateKeyHex: ISSUER_PRIV,
+      fetch,
+    })
+    const { fullDelegation, requirement } = _escalatedSetup()
+    rail.registerCardDelegation('ic_card_esc_bad', {
+      receipt_id: fullDelegation.id,
+      scope: ['commerce.purchase'],
+      spend_limit_base_units: '5000',
+      currency: 'USD',
+      wallet_id: 'ic_card_esc_bad',
+      delegator: fullDelegation.delegator,
+      escalation_requirements: [requirement],
+    })
+
+    const wrongKey = generateKeyPair()
+    const request = requestOwnerConfirmation(fullDelegation, {
+      action_class: 'commerce',
+      action_details: { kind: 'any' },
+    })
+    const tamperedConf = recordOwnerConfirmation({
+      request,
+      delegation: fullDelegation,
+      owner_private_key: wrongKey.privateKey,
+    })
+
+    const event = sampleAuthorizationEvent({
+      cardId: 'ic_card_esc_bad',
+      amountCents: 1000,
+      authId: 'iauth_esc_bad_001',
+    })
+    const decision = await rail.handleAuthorizationWebhook(event, {
+      owner_confirmation: tamperedConf,
+    })
+    assert.equal(decision.approved, false)
+    assert.equal(decision.reason, 'requires_owner_confirmation')
+  })
+
+  it('flagged on different action_class than commerce: existing approve path', async () => {
+    const { fetch } = makeMockFetch({
+      fallback: ({ url }) => ({
+        body: { id: url.split('/').slice(-2, -1)[0] ?? 'iauth_x', status: 'pending' },
+      }),
+    })
+    const rail = createStripeIssuingRail({
+      apiKey: TEST_KEY,
+      issuerPrivateKeyHex: ISSUER_PRIV,
+      fetch,
+    })
+    const ownerKey = generateKeyPair()
+    rail.registerCardDelegation('ic_card_other', {
+      receipt_id: 'deleg-other',
+      scope: ['commerce.purchase'],
+      spend_limit_base_units: '5000',
+      currency: 'USD',
+      wallet_id: 'ic_card_other',
+      delegator: ownerKey.publicKey,
+      escalation_requirements: [
+        {
+          action_class: 'org_creation',
+          requires_owner_confirmation: true,
+          confirmation_ttl_ms: 5 * 60 * 1000,
+          confirmation_scope: 'time_window',
+        },
+      ],
+    })
+    const event = sampleAuthorizationEvent({
+      cardId: 'ic_card_other',
+      amountCents: 1000,
+      authId: 'iauth_other_001',
+    })
+    const decision = await rail.handleAuthorizationWebhook(event)
+    assert.equal(decision.approved, true)
   })
 })
 
