@@ -380,6 +380,29 @@ export interface SignAcpReceiptInput {
   session_state: AcpCheckoutSession
   delegation_ref?: string
   agent_id: string
+  /** Phase 4.1 / Q1: opt into the AccountabilityReceiptBase-aligned shape.
+   *  When set (or scope_of_claim supplied), the receipt carries
+   *  claim_type='rail.acp.v1', timestamp aliasing issued_at, and
+   *  scope_of_claim. Default: legacy shape (no new fields). */
+  accountability_shape?: boolean
+  /** Override the rail's default scope_of_claim. Setting this implies
+   *  accountability_shape=true. */
+  scope_of_claim?: import('../../accountability/types/base.js').ScopeOfClaim
+}
+
+function defaultAcpReceiptScope(): import('../../accountability/types/base.js').ScopeOfClaim {
+  return {
+    asserts: 'aps:rail.acp:checkout — an ACP checkout-session op was authorized under the cited V2Delegation; request_digest binds the canonical body, session_state the merchant return.',
+    does_not_assert: [
+      'funds settled (ACP completion can still be reversed)',
+      "merchant's legal identity matches payment_provider.provider",
+      'goods or services were delivered',
+      'idempotency was enforced (caller maintains the cache)',
+    ],
+    capture_mode: 'gateway_observed',
+    completeness: 'complete',
+    self_attested: false,
+  }
 }
 
 export function signAcpReceipt(
@@ -388,6 +411,9 @@ export function signAcpReceipt(
 ): AcpReceipt {
   const signerPub = publicKeyFromPrivate(signerPrivateKeyHex)
   const requestDigest = canonicalDigest(input.request_body)
+  const issued_at = nowIso()
+  const useAccountabilityShape =
+    input.accountability_shape === true || input.scope_of_claim !== undefined
 
   const unsigned: Omit<AcpReceipt, 'signature'> = {
     receipt_id: `acpr_${randomUUID()}`,
@@ -400,7 +426,12 @@ export function signAcpReceipt(
     signer: signerPub,
     session_state: input.session_state,
     request_digest: requestDigest,
-    issued_at: nowIso(),
+    issued_at,
+  }
+  if (useAccountabilityShape) {
+    unsigned.claim_type = 'rail.acp.v1'
+    unsigned.timestamp = issued_at
+    unsigned.scope_of_claim = input.scope_of_claim ?? defaultAcpReceiptScope()
   }
 
   const sigBytes = canonicalizeJCS(unsigned)
@@ -456,6 +487,25 @@ export function verifyAcpReceipt(
   const nowMs = (options.now ?? new Date()).getTime()
   if (nowMs - issuedMs > ttl * 1000) {
     return { valid: false, reason: 'EXPIRED', detail: `older than ${ttl}s` }
+  }
+
+  // Phase 4.1 / Q1: when claim_type is set, additionally enforce the
+  // accountability-shape invariants. Legacy receipts (no claim_type)
+  // skip this block and verify under the existing path.
+  if (receipt.claim_type !== undefined) {
+    if (receipt.claim_type !== 'rail.acp.v1') {
+      return { valid: false, reason: 'INVALID_RECEIPT_KIND', detail: `claim_type=${receipt.claim_type}` }
+    }
+    if (receipt.timestamp !== receipt.issued_at) {
+      return { valid: false, reason: 'MISSING_REQUIRED_FIELD', detail: 'timestamp != issued_at' }
+    }
+    if (
+      !receipt.scope_of_claim ||
+      typeof receipt.scope_of_claim.asserts !== 'string' ||
+      receipt.scope_of_claim.asserts.length === 0
+    ) {
+      return { valid: false, reason: 'MISSING_REQUIRED_FIELD', detail: 'scope_of_claim' }
+    }
   }
 
   // signature verify — strip sig, canonicalize, verify

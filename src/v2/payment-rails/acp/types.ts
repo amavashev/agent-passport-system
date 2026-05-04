@@ -22,6 +22,9 @@
 // merchant onboarding, settlement, dispute orchestration.
 // ══════════════════════════════════════════════════════════════════
 
+import type { ScopeOfClaim } from '../../accountability/types/base.js'
+export type { ScopeOfClaim } from '../../accountability/types/base.js'
+
 /** ACP wire-version header. Date-versioned per the spec. */
 export const ACP_API_VERSION = '2025-09-29' as const
 
@@ -190,13 +193,27 @@ export interface AcpErrorResponse {
 export type AcpOp = 'create' | 'update' | 'complete' | 'cancel' | 'retrieve'
 
 /**
- * AcpReceipt is the APS-signed proof that a particular checkout-session
- * operation was authorized by a delegation and went out under that scope.
- * The receipt binds the agent, the delegation, the requested operation,
- * the canonical request body digest, and the resulting (or proposed)
- * session state into a single signed object so any third party can
- * later verify the merchant call was scope-bounded at the moment it
- * happened.
+ * AcpReceipt — APS-signed proof of an ACP checkout-session op (Phase 4.1 / Q1).
+ *
+ * NEGATIVE EVIDENTIARY SEMANTIC. An AcpReceipt proves:
+ *   - An ACP checkout-session operation (create/update/complete/cancel/retrieve)
+ *     was issued under a V2Delegation scoped to it
+ *   - The canonical request body digest was bound to the delegation_ref
+ *   - The merchant's frozen session_state was captured at receipt mint time
+ *
+ * It does NOT prove:
+ *   - Funds settled successfully (ACP op may complete and still be reversed)
+ *   - The merchant's legal identity is what `payment_provider.provider` claims
+ *   - The buyer received the goods or services
+ *   - Idempotency was enforced (caller maintains the idempotency cache)
+ *
+ * APSBundle aggregators MUST treat an AcpReceipt as evidence of "the ACP
+ * op was authorized and crossed the wire" — not "the purchase delivered."
+ *
+ * Phase 4.1 / Q1 fields (`claim_type`, `timestamp`, `scope_of_claim`) are
+ * optional for compatible-superset migration. Receipts minted by the
+ * accountability-aligned signing path populate them; legacy receipts
+ * continue to verify under the existing per-rail verifier path.
  */
 export interface AcpReceipt {
   receipt_id: string
@@ -225,6 +242,14 @@ export interface AcpReceipt {
 
   /** Hex Ed25519 signature over the canonical receipt body, sig field cleared. */
   signature: string
+
+  /** Phase 4.1 / Q1: AccountabilityReceiptBase-aligned claim_type literal.
+   *  Populated by new signing path with `'rail.acp.v1'`; absent on legacy. */
+  claim_type?: 'rail.acp.v1'
+  /** Phase 4.1 / Q1: alias of issued_at. */
+  timestamp?: string
+  /** Phase 4.1 / Q1: scope-of-claim declaration. */
+  scope_of_claim?: ScopeOfClaim
 }
 
 /** Reasons APS will refuse to allow an ACP operation. */
@@ -270,6 +295,11 @@ export interface AcpDenial {
 
   issued_at: string
   signature: string
+
+  /** Phase 4.1 / Q1 accountability fields (optional, compatible-superset). */
+  claim_type?: 'rail.acp.denial.v1'
+  timestamp?: string
+  scope_of_claim?: ScopeOfClaim
 }
 
 // ── Verification result types ─────────────────────────────────────
