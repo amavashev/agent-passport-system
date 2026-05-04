@@ -72,6 +72,36 @@ export interface SettlementAxisIndex {
   axis_merkle_root: string
 }
 
+/**
+ * PaymentObligationRef — Phase 4.1 / Q2 (Hybrid binding, Option C).
+ *
+ * NEGATIVE EVIDENTIARY SEMANTIC. A PaymentObligationRef is an INTENT,
+ * not proof. It declares "this payment is expected to settle for the
+ * SettlementRecord's period," NOT "this payment occurred." Pair with a
+ * downstream rail-emitted PaymentReceipt (linked back via
+ * attribution_receipt_id) to close the chain
+ * SettlementRecord → AttributionReceipt → PaymentReceipt.
+ *
+ * Phase 4.1 / Q2 ships the link fields only — NOT cryptographic
+ * binding. Phase 5 adds payment_axis (parallel Merkle commitment over
+ * actual PaymentReceipts) when triggered by federal/AAIF/NCCoE asks
+ * for "complete payment flow as one Merkle proof." Until then,
+ * payment_obligations sits intent-side and is NOT covered by
+ * input_receipts_hash or any axis Merkle root.
+ */
+export interface PaymentObligationRef {
+  /** Recipient DID (the contributor receiving payment). */
+  recipient_did: string
+  /** Amount to be paid in minor units (cents). */
+  amount_cents: number
+  /** ISO 4217 currency code, lowercase (matches rest of APS). */
+  currency: string
+  /** Optional rail hint — tells downstream which rail will settle this. */
+  rail_hint?: 'foundation' | 'ap2' | 'x402' | 'stripe-issuing' | 'acp' | 'mpp'
+  /** Optional link to the AttributionReceipt this obligation derives from. */
+  attribution_receipt_id?: string
+}
+
 /** Top-level settlement record §"The settlement record". Signed by the
  *  gateway over canonicalize(record minus signature). */
 export interface SettlementRecord {
@@ -90,6 +120,20 @@ export interface SettlementRecord {
   input_receipts_hash: string
   total_input_count: number
   issued_at: string
+  /**
+   * Phase 4.1 / Q2 (Hybrid, Option C). Intent-side outbound pointer
+   * declaring the payments expected to settle this period.
+   *
+   * **NOT Merkle-bound.** Phase 5 adds `payment_axis` with cryptographic
+   * binding parallel to `axes.{D,P,G,C}` when triggered. Until then,
+   * payment_obligations is for chain traversal and human review only.
+   * It rides inside the gateway's signature (canonicalize-then-sign
+   * covers it) but is not committed via any axis Merkle root.
+   *
+   * Compatible-superset: omitted on legacy records; canonicalization
+   * drops undefined fields so pre-Q2 fixtures re-verify byte-for-byte.
+   */
+  payment_obligations?: PaymentObligationRef[]
   signature: string
 }
 
