@@ -1600,18 +1600,25 @@ export type {
   X402VerifyResponse,
 } from './v2/payment-rails/index.js'
 
-// ── v2.6.x payment-rails / Stripe Issuing reference adapter ──────
-// Mints agent-scoped one-time virtual cards via the Stripe Issuing
-// API and intercepts issuing_authorization.request webhooks. APS
-// gates run before Stripe is told to approve, so an authorization
-// that would violate delegation scope, budget, time window, or
-// wallet-revoked status is declined at the rail boundary and never
-// settles. Test mode only; constructor refuses sk_live_ keys.
+// ── v2.6.x payment-rails / Stripe Issuing protocol primitives ────
+// Phase 4.1 boundary split moved the orchestration class
+// `StripeIssuingRail` and `createStripeIssuingRail` factory to the
+// private gateway repo (live HTTP client + credential handling +
+// in-memory card↔delegation registry). The SDK ships protocol
+// primitives only: V2Delegation→SpendingControls mapper,
+// V2Delegation→DelegationView projection, Stripe webhook signature
+// verifier (HMAC-SHA256 over `${t}.${rawBody}` per Stripe scheme=v1),
+// the form-urlencoded body encoder pinning the on-the-wire shape,
+// and the rail constants. Gateway consumes via this package.
 export {
-  createStripeIssuingRail,
   defaultMapDelegationToSpendingControls,
-  StripeIssuingRail,
+  stripeIssuingDelegationToView,
+  stripeIssuingEncodeForm,
   verifyStripeSignature,
+  STRIPE_ISSUING_DEFAULT_API_BASE,
+  STRIPE_ISSUING_DEFAULT_REQUIRED_SCOPE,
+  STRIPE_ISSUING_DEFAULT_TOLERANCE_SEC,
+  STRIPE_ISSUING_RAIL_NAME,
 } from './v2/payment-rails/index.js'
 
 export type {
