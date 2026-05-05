@@ -79,6 +79,7 @@
   },
   "files": [
     "dist/src/**/*",
+    "src/v2/payment-rails/stripe-issuing/fixtures/**",
     "values/",
     "README.md",
     "LICENSE"
