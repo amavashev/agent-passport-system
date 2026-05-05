@@ -197,11 +197,20 @@ export type {
 // webhooks to enforce APS delegation gates BEFORE Stripe approves.
 // Reference adapter is sk_test_ only; refuses sk_live_ in constructor.
 
+// Phase 4.1 boundary split: the orchestration class `StripeIssuingRail`
+// and `createStripeIssuingRail` factory have moved to the private gateway
+// repo. The SDK ships only protocol primitives — mapper, V2Delegation
+// projection, signature verifier, form encoder, and the rail constants.
+// Gateway consumes them via the `agent-passport-system` npm package.
 export {
-  createStripeIssuingRail,
   defaultMapDelegationToSpendingControls,
-  StripeIssuingRail,
+  delegationToView as stripeIssuingDelegationToView,
+  encodeForm as stripeIssuingEncodeForm,
   verifyStripeSignature,
+  DEFAULT_API_BASE as STRIPE_ISSUING_DEFAULT_API_BASE,
+  DEFAULT_REQUIRED_SCOPE as STRIPE_ISSUING_DEFAULT_REQUIRED_SCOPE,
+  DEFAULT_TOLERANCE_SEC as STRIPE_ISSUING_DEFAULT_TOLERANCE_SEC,
+  RAIL_NAME as STRIPE_ISSUING_RAIL_NAME,
 } from './stripe-issuing/index.js'
 export type {
   Authorization as StripeAuthorization,
