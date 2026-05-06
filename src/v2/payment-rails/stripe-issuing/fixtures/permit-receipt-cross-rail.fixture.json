@@ -1,0 +1,119 @@
+{
+  "fixture_metadata": {
+    "name": "permit-receipt-cross-rail",
+    "issue": "stripe/ai#356",
+    "purpose": "Three-event lifecycle (permit / revocation / re-issue) demonstrating cross-rail interop with Mycelium TrailRecord (Base anchored) and Asqav protectmcp:lifecycle (RFC 3161 + OTS anchored).",
+    "deterministic": true,
+    "issuer": {
+      "pub_hex": "207a067892821e25d770f1fba0c47c11ff4b813e54162ece9eb839e076231ab6",
+      "priv_hex_disclosure": "fixture-only deterministic key; do not use in production. Disclosed for byte-parity test reproduction.",
+      "priv_hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    },
+    "canonicalization": "JCS (RFC 8785)",
+    "signature_alg": "EdDSA / Ed25519",
+    "receipt_id_derivation": "sha256 hex over canonicalize({...event, receipt_id: '', signature: ''})"
+  },
+  "events": {
+    "permit": {
+      "claim_type": "rail.payment.v1",
+      "receipt_id": "3d08d796a0ca189fc0890e8f7e9523d0e19e617519d0d3f35bb05c8111d5b1bc",
+      "signer_did": "207a067892821e25d770f1fba0c47c11ff4b813e54162ece9eb839e076231ab6",
+      "issued_at": "2026-05-06T20:00:00.000Z",
+      "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "action_ref": "0000000000000000000000000000000000000000000000000000000000000000",
+      "rail_name": "stripe-issuing",
+      "amount_base_units": "1234",
+      "currency": "usd",
+      "tx_proof": "iauth_fixture_permit_001",
+      "signature": "7a905be795b41ef1d4242a62f6e8cd887e257eefc9cb9a9d2fcf18fee1b0bfb647015b0bcf1bd535664602c150e90819983174366c595fde45f031a64a06690f",
+      "timestamp": "2026-05-06T20:00:00.000Z",
+      "scope_of_claim": {
+        "asserts": "aps:rail.payment:emit — a payment instruction was emitted on the rail under the named delegation; tx_proof anchors the rail-side outcome.",
+        "does_not_assert": [
+          "recipient earned the value",
+          "underlying contribution validity",
+          "settlement finality (rails have dispute/refund/chargeback windows)",
+          "counterparty legal identity"
+        ],
+        "capture_mode": "gateway_observed",
+        "completeness": "complete",
+        "self_attested": false
+      }
+    },
+    "revocation": {
+      "claim_type": "rail.payment.denial.v1",
+      "receipt_id": "91c8b685cbf37dd6bf577b10bf6f8fe8ab4a328a296338cf0590d78622ac6eac",
+      "signer_did": "207a067892821e25d770f1fba0c47c11ff4b813e54162ece9eb839e076231ab6",
+      "issued_at": "2026-05-06T20:01:00.000Z",
+      "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "action_ref": "1111111111111111111111111111111111111111111111111111111111111111",
+      "rail_name": "stripe-issuing",
+      "amount_base_units": "1234",
+      "currency": "usd",
+      "denial_reason": "wallet_revoked",
+      "signature": "5a93085e84fd9f81bf71a763eedd0090de0242d59698841f7f15d1a7a7602620c82b579744b14bdb99cee8830a775f87c8fb3d530c1a588f29bd817f9c20db04",
+      "timestamp": "2026-05-06T20:01:00.000Z",
+      "scope_of_claim": {
+        "asserts": "aps:rail.payment:deny — a payment instruction was refused on the rail with a closed-taxonomy denial reason.",
+        "does_not_assert": [
+          "the rail itself is unavailable",
+          "the agent acted maliciously",
+          "the underlying delegation is invalid (denial may flag a single missing constraint)"
+        ],
+        "capture_mode": "gateway_observed",
+        "completeness": "complete",
+        "self_attested": false
+      },
+      "reason_detail": "delegation D revoked off-rail; subsequent payment attempt denied"
+    },
+    "reissue": {
+      "claim_type": "rail.payment.v1",
+      "receipt_id": "5fc416ac911a4c4b9708ba9f7a3142c8943d59130f88782debe690963dea0807",
+      "signer_did": "207a067892821e25d770f1fba0c47c11ff4b813e54162ece9eb839e076231ab6",
+      "issued_at": "2026-05-06T20:02:00.000Z",
+      "delegation_ref": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "action_ref": "2222222222222222222222222222222222222222222222222222222222222222",
+      "rail_name": "stripe-issuing",
+      "amount_base_units": "1234",
+      "currency": "usd",
+      "tx_proof": "iauth_fixture_reissue_001",
+      "signature": "df9e1d1ef3f06e137dcc596cd51999d2baeefb7f59edab95cadd26ca98cd0dabd08a97145f7e66a48fe37b8f1236f2dae71be29f483cb247f7a43c045ac9c808",
+      "timestamp": "2026-05-06T20:02:00.000Z",
+      "scope_of_claim": {
+        "asserts": "aps:rail.payment:emit — a payment instruction was emitted on the rail under the named delegation; tx_proof anchors the rail-side outcome.",
+        "does_not_assert": [
+          "recipient earned the value",
+          "underlying contribution validity",
+          "settlement finality (rails have dispute/refund/chargeback windows)",
+          "counterparty legal identity"
+        ],
+        "capture_mode": "gateway_observed",
+        "completeness": "complete",
+        "self_attested": false
+      }
+    }
+  },
+  "cross_rail_keys": {
+    "permit": {
+      "receipt_id": "3d08d796a0ca189fc0890e8f7e9523d0e19e617519d0d3f35bb05c8111d5b1bc",
+      "action_ref": "0000000000000000000000000000000000000000000000000000000000000000",
+      "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "role": "permit",
+      "notes": "Mycelium TrailRecord(permit).payment_hash = receipt_id. action_ref = R0 = both rails' linking key for the permit event."
+    },
+    "revocation": {
+      "receipt_id": "91c8b685cbf37dd6bf577b10bf6f8fe8ab4a328a296338cf0590d78622ac6eac",
+      "action_ref": "1111111111111111111111111111111111111111111111111111111111111111",
+      "delegation_ref": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "role": "revocation",
+      "notes": "Same delegation_ref as permit (cross-rail lineage link). action_ref = R1, distinct per content. denial_reason=wallet_revoked is the rail-level signal that off-rail revocation took effect."
+    },
+    "reissue": {
+      "receipt_id": "5fc416ac911a4c4b9708ba9f7a3142c8943d59130f88782debe690963dea0807",
+      "action_ref": "2222222222222222222222222222222222222222222222222222222222222222",
+      "delegation_ref": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "role": "reissue",
+      "notes": "New delegation_ref (D') that supersedes the original D off-rail. Lineage to permit goes through D'.supersedes=hash(D) on the delegation object."
+    }
+  }
+}
