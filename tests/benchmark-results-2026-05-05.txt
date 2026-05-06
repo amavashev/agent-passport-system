@@ -1,0 +1,25 @@
+═══════════════════════════════════════════════════
+  APS Gateway Latency Benchmark
+  2026-05-06T05:28:06.709Z
+  500 iterations per scenario (+ 10 warmup)
+═══════════════════════════════════════════════════
+
+Minimal (sig + scope only) (500 iterations):
+  p50=0.133ms  p95=0.160ms  p99=0.275ms  mean=0.142ms  min=0.128ms  max=1.114ms
+
+Standard (sig + scope + rep + HLC) (500 iterations):
+  p50=0.131ms  p95=0.148ms  p99=0.171ms  mean=0.135ms  min=0.129ms  max=0.324ms
+
+Full (all enforcement) (500 iterations):
+  p50=0.132ms  p95=0.152ms  p99=0.198ms  mean=0.136ms  min=0.129ms  max=0.386ms
+
+Burst (100 rapid sequential):
+  p50=0.130ms  p95=0.144ms  p99=0.151ms  mean=0.135ms  min=0.128ms  max=0.374ms
+  total=13.5ms  throughput=7409 ops/sec
+
+Denied path (spend exceeded):
+  p50=0.075ms  p95=0.085ms  p99=0.108ms  mean=0.077ms  min=0.073ms  max=0.271ms
+
+═══════════════════════════════════════════════════
+  Benchmark complete
+═══════════════════════════════════════════════════
