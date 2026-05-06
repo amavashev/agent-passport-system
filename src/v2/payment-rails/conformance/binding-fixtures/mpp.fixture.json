@@ -1,0 +1,231 @@
+{
+  "rail_name": "mpp",
+  "schema_version": "1.0.0",
+  "conformance": [
+    {
+      "id": "BIND-CONF-01",
+      "description": "both numeric spend-cap forms populated to 50000",
+      "expected_cap_minor_units": 50000,
+      "delegation": {
+        "id": "aps-deleg-bind-conf-01",
+        "version": 1,
+        "supersedes": null,
+        "supersession_justification": null,
+        "delegator": "did:aps:test-user",
+        "delegatee": "did:aps:test-agent",
+        "scope": {
+          "action_categories": ["commerce", "commerce.checkout", "payment"],
+          "domain": "commerce",
+          "resource_limits": { "spend_limit_cents": 50000, "commerce.spend_limit": 50000 },
+          "constraints": { "fixture": "binding-conformance" }
+        },
+        "policy_context": {
+          "policy_version": "v2",
+          "values_floor_version": "v1",
+          "trust_epoch": 0,
+          "issuer_id": "did:aps:test-user",
+          "created_at": "2026-01-01T00:00:00.000Z",
+          "valid_from": "2026-01-01T00:00:00.000Z",
+          "valid_until": "2027-01-01T00:00:00.000Z"
+        },
+        "signature": "",
+        "status": "active",
+        "renewal_reason": null,
+        "expansion_reviewer": null,
+        "expansion_review_sig": null,
+        "assurance_class": "self_attested"
+      }
+    },
+    {
+      "id": "BIND-CONF-02",
+      "description": "only commerce.spend_limit alias populated, value 75000",
+      "expected_cap_minor_units": 75000,
+      "delegation": {
+        "id": "aps-deleg-bind-conf-02",
+        "version": 1,
+        "supersedes": null,
+        "supersession_justification": null,
+        "delegator": "did:aps:test-user",
+        "delegatee": "did:aps:test-agent",
+        "scope": {
+          "action_categories": ["commerce", "commerce.checkout", "payment"],
+          "domain": "commerce",
+          "resource_limits": { "commerce.spend_limit": 75000 },
+          "constraints": { "fixture": "binding-conformance" }
+        },
+        "policy_context": {
+          "policy_version": "v2",
+          "values_floor_version": "v1",
+          "trust_epoch": 0,
+          "issuer_id": "did:aps:test-user",
+          "created_at": "2026-01-01T00:00:00.000Z",
+          "valid_from": "2026-01-01T00:00:00.000Z",
+          "valid_until": "2027-01-01T00:00:00.000Z"
+        },
+        "signature": "",
+        "status": "active",
+        "renewal_reason": null,
+        "expansion_reviewer": null,
+        "expansion_review_sig": null,
+        "assurance_class": "self_attested"
+      }
+    },
+    {
+      "id": "BIND-CONF-03",
+      "description": "only constraints.spend_limit_cents string fallback, parses to 12000",
+      "expected_cap_minor_units": 12000,
+      "delegation": {
+        "id": "aps-deleg-bind-conf-03",
+        "version": 1,
+        "supersedes": null,
+        "supersession_justification": null,
+        "delegator": "did:aps:test-user",
+        "delegatee": "did:aps:test-agent",
+        "scope": {
+          "action_categories": ["commerce", "commerce.checkout", "payment"],
+          "domain": "commerce",
+          "constraints": { "fixture": "binding-conformance", "spend_limit_cents": "12000" }
+        },
+        "policy_context": {
+          "policy_version": "v2",
+          "values_floor_version": "v1",
+          "trust_epoch": 0,
+          "issuer_id": "did:aps:test-user",
+          "created_at": "2026-01-01T00:00:00.000Z",
+          "valid_from": "2026-01-01T00:00:00.000Z",
+          "valid_until": "2027-01-01T00:00:00.000Z"
+        },
+        "signature": "",
+        "status": "active",
+        "renewal_reason": null,
+        "expansion_reviewer": null,
+        "expansion_review_sig": null,
+        "assurance_class": "self_attested"
+      }
+    },
+    {
+      "id": "BIND-CONF-04",
+      "description": "both numeric forms set to zero, the boundary case",
+      "expected_cap_minor_units": 0,
+      "delegation": {
+        "id": "aps-deleg-bind-conf-04",
+        "version": 1,
+        "supersedes": null,
+        "supersession_justification": null,
+        "delegator": "did:aps:test-user",
+        "delegatee": "did:aps:test-agent",
+        "scope": {
+          "action_categories": ["commerce", "commerce.checkout", "payment"],
+          "domain": "commerce",
+          "resource_limits": { "spend_limit_cents": 0, "commerce.spend_limit": 0 },
+          "constraints": { "fixture": "binding-conformance" }
+        },
+        "policy_context": {
+          "policy_version": "v2",
+          "values_floor_version": "v1",
+          "trust_epoch": 0,
+          "issuer_id": "did:aps:test-user",
+          "created_at": "2026-01-01T00:00:00.000Z",
+          "valid_from": "2026-01-01T00:00:00.000Z",
+          "valid_until": "2027-01-01T00:00:00.000Z"
+        },
+        "signature": "",
+        "status": "active",
+        "renewal_reason": null,
+        "expansion_reviewer": null,
+        "expansion_review_sig": null,
+        "assurance_class": "self_attested"
+      }
+    },
+    {
+      "id": "BIND-CONF-05",
+      "description": "numeric forms 200000 take precedence over a divergent string fallback 9999",
+      "expected_cap_minor_units": 200000,
+      "delegation": {
+        "id": "aps-deleg-bind-conf-05",
+        "version": 1,
+        "supersedes": null,
+        "supersession_justification": null,
+        "delegator": "did:aps:test-user",
+        "delegatee": "did:aps:test-agent",
+        "scope": {
+          "action_categories": ["commerce", "commerce.checkout", "payment"],
+          "domain": "commerce",
+          "resource_limits": { "spend_limit_cents": 200000, "commerce.spend_limit": 200000 },
+          "constraints": { "fixture": "binding-conformance", "spend_limit_cents": "9999" }
+        },
+        "policy_context": {
+          "policy_version": "v2",
+          "values_floor_version": "v1",
+          "trust_epoch": 0,
+          "issuer_id": "did:aps:test-user",
+          "created_at": "2026-01-01T00:00:00.000Z",
+          "valid_from": "2026-01-01T00:00:00.000Z",
+          "valid_until": "2027-01-01T00:00:00.000Z"
+        },
+        "signature": "",
+        "status": "active",
+        "renewal_reason": null,
+        "expansion_reviewer": null,
+        "expansion_review_sig": null,
+        "assurance_class": "self_attested"
+      }
+    }
+  ],
+  "denials": [
+    {
+      "id": "BIND-MPP-DEN-01",
+      "description": "MPP method_not_allowed projects to foundation rail_error",
+      "rail_specific_reason": "method_not_allowed",
+      "expected_foundation_reason": "rail_error"
+    },
+    {
+      "id": "BIND-MPP-DEN-02",
+      "description": "MPP challenge_expired projects to foundation time_window_violation",
+      "rail_specific_reason": "challenge_expired",
+      "expected_foundation_reason": "time_window_violation"
+    },
+    {
+      "id": "BIND-MPP-DEN-03",
+      "description": "MPP no_payment_scope projects to foundation no_commerce_scope",
+      "rail_specific_reason": "no_payment_scope",
+      "expected_foundation_reason": "no_commerce_scope"
+    }
+  ],
+  "determinism": [
+    {
+      "id": "BIND-MPP-DET-01",
+      "description": "two calls on the same delegation produce byte-identical canonical JSON",
+      "expected_cap_minor_units": 50000,
+      "delegation": {
+        "id": "aps-deleg-bind-det-01",
+        "version": 1,
+        "supersedes": null,
+        "supersession_justification": null,
+        "delegator": "did:aps:test-user",
+        "delegatee": "did:aps:test-agent",
+        "scope": {
+          "action_categories": ["commerce", "commerce.checkout", "payment"],
+          "domain": "commerce",
+          "resource_limits": { "spend_limit_cents": 50000, "commerce.spend_limit": 50000 },
+          "constraints": { "fixture": "binding-conformance-determinism" }
+        },
+        "policy_context": {
+          "policy_version": "v2",
+          "values_floor_version": "v1",
+          "trust_epoch": 0,
+          "issuer_id": "did:aps:test-user",
+          "created_at": "2026-01-01T00:00:00.000Z",
+          "valid_from": "2026-01-01T00:00:00.000Z",
+          "valid_until": "2027-01-01T00:00:00.000Z"
+        },
+        "signature": "",
+        "status": "active",
+        "renewal_reason": null,
+        "expansion_reviewer": null,
+        "expansion_review_sig": null,
+        "assurance_class": "self_attested"
+      }
+    }
+  ]
+}

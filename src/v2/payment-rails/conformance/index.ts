@@ -28,3 +28,21 @@ export type {
   ScenarioOutcome,
   ScenarioReport,
 } from './harness.js'
+
+export {
+  BUILTIN_BINDING_ADAPTERS,
+  runBindingConformance,
+} from './binding-harness.js'
+
+export type {
+  BindingConformanceReport,
+  BindingFixtureSet,
+  BindingRailAdapter,
+  BindingRailName,
+  BindingScenarioReport,
+  ConformanceFixtureScenario,
+  DenialFixtureScenario,
+  DeterminismFixtureScenario,
+  RunBindingConformanceOpts,
+  Tier2Invariant,
+} from './binding-harness.js'
