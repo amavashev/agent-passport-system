@@ -3,7 +3,7 @@
 Two tiers of conformance ship in this directory. Both run from
 `./conformance/`.
 
-## Tier-1 — `PaymentRail` interface
+## Tier-1: the `PaymentRail` interface
 
 The foundation interface (`./types.ts → PaymentRail`) describes
 `createInvoice`, `checkStatus`, `verifyTransaction`, `revokeWallet`,
@@ -19,7 +19,7 @@ implementation.
 
 Canonical test vectors live at `./conformance/fixtures/SCN-*.fixture.json`.
 
-## Tier-2 — binding adapters
+## Tier-2: binding adapters
 
 The five binding adapters (`./ap2`, `./x402`, `./stripe-issuing`,
 `./acp`, `./mpp`) bind APS V2 governance to external wire

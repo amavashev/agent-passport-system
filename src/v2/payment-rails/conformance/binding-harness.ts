@@ -1,11 +1,11 @@
 // Copyright 2024-2026 Tymofii Pidlisnyi. Apache-2.0 license. See LICENSE.
 // ══════════════════════════════════════════════════════════════════
-// Payment Rails — Tier-2 binding-adapter conformance harness
+// Payment Rails: Tier-2 binding-adapter conformance harness
 // ══════════════════════════════════════════════════════════════════
 // The Tier-1 harness in `./harness.ts` exercises the foundation
 // `PaymentRail` interface against the Nano reference. Tier-2 covers
 // the five binding adapters (AP2, x402, Stripe-Issuing, ACP, MPP)
-// that are NOT a uniform PaymentRail — they bind APS V2 governance
+// that are NOT a uniform PaymentRail. They bind APS V2 governance
 // to external wire protocols. Each ships its own surface; this
 // harness pins the cross-rail invariants any sixth adapter must hold.
 //

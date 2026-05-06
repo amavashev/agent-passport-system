@@ -1,6 +1,6 @@
 // Copyright 2024-2026 Tymofii Pidlisnyi. Apache-2.0 license. See LICENSE.
 // ══════════════════════════════════════════════════════════════════
-// Tier-2 binding-adapter conformance harness — test surface
+// Tier-2 binding-adapter conformance harness: test surface
 // ══════════════════════════════════════════════════════════════════
 // Pins the cross-rail invariants for the five binding adapters
 // (AP2, x402, Stripe-Issuing, ACP, MPP). Loads per-rail fixtures
@@ -61,7 +61,7 @@ const REPORT = runBindingConformance(BUILTIN_BINDING_ADAPTERS, FIXTURES)
 
 // ── Top-level shape ──────────────────────────────────────────────
 
-describe('Tier-2 binding-adapter conformance — report shape', () => {
+describe('Tier-2 binding-adapter conformance: report shape', () => {
   it('schema_version is consensus 1.0.0 across all five rail fixtures', () => {
     assert.equal(REPORT.schema_version, '1.0.0')
   })
@@ -81,7 +81,7 @@ describe('Tier-2 binding-adapter conformance — report shape', () => {
 
 // ── (a) Field-name resolution invariant ──────────────────────────
 
-describe('Tier-2 invariant (a) — field-name resolution byte-parity', () => {
+describe('Tier-2 invariant (a): field-name resolution byte-parity', () => {
   for (const rail of RAILS) {
     for (const scn of FIXTURES[rail].conformance) {
       it(`[${rail}] ${scn.id}: ${scn.description}`, () => {
@@ -104,7 +104,7 @@ describe('Tier-2 invariant (a) — field-name resolution byte-parity', () => {
 
 // ── (b) Denial vocabulary round-trip ─────────────────────────────
 
-describe('Tier-2 invariant (b) — denial vocabulary round-trip', () => {
+describe('Tier-2 invariant (b): denial vocabulary round-trip', () => {
   for (const rail of RAILS) {
     for (const scn of FIXTURES[rail].denials) {
       it(`[${rail}] ${scn.id}: ${scn.description}`, () => {
@@ -127,7 +127,7 @@ describe('Tier-2 invariant (b) — denial vocabulary round-trip', () => {
 
 // ── (c) Resolver determinism ─────────────────────────────────────
 
-describe('Tier-2 invariant (c) — resolver determinism', () => {
+describe('Tier-2 invariant (c): resolver determinism', () => {
   for (const rail of RAILS) {
     for (const scn of FIXTURES[rail].determinism) {
       it(`[${rail}] ${scn.id}: ${scn.description}`, () => {
