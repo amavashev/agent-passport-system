@@ -1,0 +1,51 @@
+═══════════════════════════════════════════════════════════════════
+Revocation-to-Enforce Race Test — APS SDK
+═══════════════════════════════════════════════════════════════════
+
+Date: 2026-05-07T15:59:12.512Z
+Backend: VolatileBackend (in-process, in-memory Map)
+Methodology: reciprocal reproduction of @VeloGerber's race-test shape
+             (OWASP AIVSS #31, 2026-05-06)
+
+Configuration:
+  workers              4
+  qps per worker       500
+  duration per run     3s
+  runs                 3
+  revoke fires at      1500ms into each run
+
+Per-run results:
+  run 1: 6000 requests | 3000 ACCEPT, 3000 REJECT | revoke commit @ 1500ms | ACCEPTs after revoke: 0 | last-ACCEPT-after-revoke: 0ms
+  run 2: 6000 requests | 3000 ACCEPT, 3000 REJECT | revoke commit @ 1500ms | ACCEPTs after revoke: 0 | last-ACCEPT-after-revoke: 0ms
+  run 3: 6000 requests | 3000 ACCEPT, 3000 REJECT | revoke commit @ 1500ms | ACCEPTs after revoke: 0 | last-ACCEPT-after-revoke: 0ms
+
+Aggregate (across all runs):
+  total requests       18000
+  ACCEPTs after revoke 0
+  P50                  0.00ms
+  P95                  0.00ms
+  P99                  0.00ms
+  MAX                  0.00ms
+
+Interpretation:
+  Zero ACCEPTs slipped through after the revocation commit. The
+  in-process VolatileBackend exposes the revocation atomically to all
+  workers sharing the same Map instance; no cache window exists.
+
+  This bounds the SDK primitive at <1ms. Real-world latency is
+  introduced by the persistence layer chosen by the consumer (SQLite,
+  Postgres, Redis, etc.) and any caching layer above it. To measure
+  cross-process coherency, swap a network-backed RevocationStorage
+  implementation in via the same interface and re-run this script.
+
+Cross-implementation comparison (AIVSS dimension):
+  @VeloGerber audit-pack-signing v0.5 (SQLite WAL, multi-process):
+    P50/P95/P99/MAX = 0.00ms across 18,000 requests
+  APS SDK VolatileBackend (in-process):
+    P50=0.00 P95=0.00 P99=0.00 MAX=0.00ms
+
+Both implementations sit at the high tier of the proposed scoring
+dimension (P99 < 100ms with empirical methodology). Methodology
+portability is the load-bearing claim — the dimension reproduces
+across two independent implementations using the same race-test
+shape.
