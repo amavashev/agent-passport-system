@@ -1,0 +1,41 @@
+# Gitleaks ignore file — fingerprints classified as false positives during the
+# 2026-05-06 audit. All hits below are legitimate fixture content, public keys,
+# or doc examples (verified by spot-check). Adding new fingerprints requires
+# manual review against the local audit log to prevent the ignore file
+# becoming a silent leak surface.
+#
+# Format: one fingerprint per line, # for comments.
+
+00b712c4ace40395fc1b1d0df5c7c66e50513961:tests/v2/payment-rails/stripe-issuing-primitives.test.ts:generic-api-key:44
+095d38255a3bc36a9304e33b8eb95501ecf443b4:interop/fixtures/agentnexus/happy-path.json:generic-api-key:121
+095d38255a3bc36a9304e33b8eb95501ecf443b4:interop/fixtures/agentnexus/happy-path.json:generic-api-key:188
+095d38255a3bc36a9304e33b8eb95501ecf443b4:interop/fixtures/agentnexus/happy-path.json:generic-api-key:196
+095d38255a3bc36a9304e33b8eb95501ecf443b4:interop/fixtures/agentnexus/happy-path.json:generic-api-key:8
+095d38255a3bc36a9304e33b8eb95501ecf443b4:interop/fixtures/agentnexus/happy-path.json:generic-api-key:86
+246cc4bdb398d6d116be7a783030dac14bda1ce5:README.md:generic-api-key:258
+65ed6d59b6c010f0d0ddfaca27e9ffe2df6c29dd:fixtures/inference-session/inference-session-fixtures.json:generic-api-key:115
+65ed6d59b6c010f0d0ddfaca27e9ffe2df6c29dd:fixtures/inference-session/inference-session-fixtures.json:generic-api-key:96
+7defffa74cbfe377f965c0cfe70314ad148472d0:tests/governance-block.test.ts:generic-api-key:327
+8fc4e60723c63fa81e56d2bd634479592a1464d9:src/v2/payment-rails/stripe-issuing/fixtures/_generate.ts:generic-api-key:43
+8fc4e60723c63fa81e56d2bd634479592a1464d9:src/v2/payment-rails/stripe-issuing/fixtures/spending-controls-derived.fixture.json:generic-api-key:7
+8fc4e60723c63fa81e56d2bd634479592a1464d9:tests/v2/payment-rails/stripe-issuing-live.test.ts:generic-api-key:70
+8fc4e60723c63fa81e56d2bd634479592a1464d9:tests/v2/payment-rails/stripe-issuing.test.ts:generic-api-key:59
+925a6fcb7dcf4530e1975fa281d055ac3edc7d2c:interop/fixtures/agentnexus/happy-path.json:generic-api-key:121
+925a6fcb7dcf4530e1975fa281d055ac3edc7d2c:interop/fixtures/agentnexus/happy-path.json:generic-api-key:188
+925a6fcb7dcf4530e1975fa281d055ac3edc7d2c:interop/fixtures/agentnexus/happy-path.json:generic-api-key:196
+925a6fcb7dcf4530e1975fa281d055ac3edc7d2c:interop/fixtures/agentnexus/happy-path.json:generic-api-key:8
+925a6fcb7dcf4530e1975fa281d055ac3edc7d2c:interop/fixtures/agentnexus/happy-path.json:generic-api-key:86
+9d3359cd009af8f5ecca7cab3e968999fe0e8675:src/v2/payment-rails/stripe-issuing/fixtures/_generate.ts:generic-api-key:43
+9d3359cd009af8f5ecca7cab3e968999fe0e8675:src/v2/payment-rails/stripe-issuing/fixtures/spending-controls-derived.fixture.json:generic-api-key:7
+9d3359cd009af8f5ecca7cab3e968999fe0e8675:tests/v2/payment-rails/stripe-issuing-live.test.ts:generic-api-key:70
+9d3359cd009af8f5ecca7cab3e968999fe0e8675:tests/v2/payment-rails/stripe-issuing.test.ts:generic-api-key:59
+a6275c8a548e5bc591403da2131081306d33a92a:tests/cross-algo-mismatch.test.ts:generic-api-key:28
+aaddf8b56c56abd0c85c4a8806b4ba8dc77b3bc4:tests/idempotency.test.ts:generic-api-key:125
+b5176532a4667b87f0babaaa0720b57d02228cec:tests/v2/payment-rails/stripe-issuing-primitives.test.ts:generic-api-key:44
+d3a522400ec04b072ed726888fa29a2c983be067:tests/qntm-bridge.test.ts:generic-api-key:22
+d3a522400ec04b072ed726888fa29a2c983be067:tests/qntm-bridge.test.ts:generic-api-key:23
+d3a522400ec04b072ed726888fa29a2c983be067:tests/qntm-bridge.test.ts:generic-api-key:24
+e55e2d79677f964114b57841ee950510c00db903:tests/v2/fixtures/cognitive-attestation/valid_envelope.json:generic-api-key:6
+e93691f3622333964070ed2a7f056221b1565c72:src/v2/mutual-auth/certificate.ts:generic-api-key:37
+e93691f3622333964070ed2a7f056221b1565c72:src/v2/mutual-auth/certificate.ts:generic-api-key:57
+e93691f3622333964070ed2a7f056221b1565c72:src/v2/mutual-auth/handshake.ts:generic-api-key:104
