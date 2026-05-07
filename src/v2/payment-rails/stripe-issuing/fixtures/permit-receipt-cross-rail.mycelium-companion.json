@@ -2,8 +2,8 @@
   "companion_metadata": {
     "fixture": "permit-receipt-cross-rail",
     "fixture_source": "aeoess/agent-passport-system@main/src/v2/payment-rails/stripe-issuing/fixtures/permit-receipt-cross-rail.fixture.json",
-    "mycelium_layer": "post-execution TrailRecord (Base mainnet anchoring queued)",
-    "purpose": "Each PaymentReceipt event in the fixture corresponds to one Mycelium TrailRecord. Linking key: payment_hash = receipt_id. Independently verifiable via the public Mycelium verify endpoint.",
+    "mycelium_layer": "post-execution TrailRecord (Arbitrum One + Base mainnet dual-chain anchored)",
+    "purpose": "Each PaymentReceipt event in the fixture corresponds to one Mycelium TrailRecord. Linking key: payment_hash = receipt_id. Independently verifiable via the public Mycelium verify endpoint, which exposes per-chain anchors under `anchors.arbitrum` (chain_id 42161) and `anchors.base` (chain_id 8453).",
     "verify_endpoint": "https://argentum.rgiskard.xyz/trails/verify",
     "verify_by": ["payment_hash (receipt_id)", "action_ref + agent_id"],
     "agent_id": "aeoess-aps",

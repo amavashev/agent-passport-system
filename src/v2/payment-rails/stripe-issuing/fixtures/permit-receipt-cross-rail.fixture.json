@@ -2,7 +2,7 @@
   "fixture_metadata": {
     "name": "permit-receipt-cross-rail",
     "issue": "stripe/ai#356",
-    "purpose": "Three-event lifecycle (permit / revocation / re-issue) demonstrating cross-rail interop with Mycelium TrailRecord (Base anchored) and Asqav protectmcp:lifecycle (RFC 3161 + OTS anchored).",
+    "purpose": "Three-event lifecycle (permit / revocation / re-issue) demonstrating cross-rail interop with Mycelium TrailRecord (Arbitrum One + Base mainnet dual-chain anchored) and Asqav protectmcp:lifecycle (RFC 3161 + OTS anchored).",
     "deterministic": true,
     "issuer": {
       "pub_hex": "207a067892821e25d770f1fba0c47c11ff4b813e54162ece9eb839e076231ab6",

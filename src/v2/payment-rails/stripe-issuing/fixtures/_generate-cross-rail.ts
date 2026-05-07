@@ -146,7 +146,7 @@ const fixture = {
     name: 'permit-receipt-cross-rail',
     issue: 'stripe/ai#356',
     purpose:
-      'Three-event lifecycle (permit / revocation / re-issue) demonstrating cross-rail interop with Mycelium TrailRecord (Base anchored) and Asqav protectmcp:lifecycle (RFC 3161 + OTS anchored).',
+      'Three-event lifecycle (permit / revocation / re-issue) demonstrating cross-rail interop with Mycelium TrailRecord (Arbitrum One + Base mainnet dual-chain anchored) and Asqav protectmcp:lifecycle (RFC 3161 + OTS anchored).',
     deterministic: true,
     issuer: {
       pub_hex: ISSUER_PUB_HEX,
