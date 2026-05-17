@@ -1,0 +1,29 @@
+# Label definitions for agent-passport-system.
+# No remote mutation here: apply with a label-sync action or `gh label create`.
+- name: open-problem
+  description: An unsolved problem open for contribution.
+  color: "ededed"
+- name: good-first-artifact
+  description: A good first artifact for new contributors.
+  color: "e0e0e0"
+- name: fixture-needed
+  description: A fixture is needed here.
+  color: "ededed"
+- name: negative-path
+  description: Covers a negative or failure path.
+  color: "e0e0e0"
+- name: conformance-candidate
+  description: Candidate for conformance review.
+  color: "ededed"
+- name: experimental
+  description: Experimental, not proposed-canonical.
+  color: "e0e0e0"
+- name: needs-reproducibility
+  description: Reproducibility evidence is missing or incomplete.
+  color: "ededed"
+- name: no-live-dependency
+  description: Runs without live or external dependencies.
+  color: "e0e0e0"
+- name: canonical-review
+  description: Under review for canonical status.
+  color: "ededed"
