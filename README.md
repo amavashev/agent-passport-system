@@ -161,6 +161,7 @@ The composition contract specifies how a verifier MUST cross-check per-request s
 
 - [Contribution path](/CONTRIBUTION_PATH.md)
 - [Open problems](/OPEN_PROBLEMS.md)
+- [Governance surfaces](/GOVERNANCE_SURFACES.md)
 
 ## Links
 
