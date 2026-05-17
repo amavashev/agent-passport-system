@@ -15,7 +15,7 @@ oatr/
 .claude/settings.local.json
 
 # 2026-04-29 internal-staging sweep — moved to ~/aeoess-private/
-experiments/
+/experiments/
 papers/agent-social-contract-backup.md
 papers/elicitation-prompts.md
 papers/review-prompt-paper-a.md

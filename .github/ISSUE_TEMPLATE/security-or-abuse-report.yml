@@ -1,0 +1,65 @@
+name: Security or abuse report
+description: Report a security or abuse concern.
+body:
+  - type: textarea
+    id: problem-addressed
+    attributes:
+      label: Problem addressed
+      description: Which problem does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: what-it-proves
+    attributes:
+      label: What this artifact proves
+      description: State precisely what this artifact demonstrates.
+    validations:
+      required: true
+  - type: textarea
+    id: what-it-does-not-prove
+    attributes:
+      label: What it does not prove
+      description: State the limits of this artifact.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: List all dependencies required.
+    validations:
+      required: true
+  - type: textarea
+    id: how-to-reproduce
+    attributes:
+      label: How to reproduce
+      description: Step-by-step reproduction instructions.
+    validations:
+      required: true
+  - type: dropdown
+    id: requires-network-access
+    attributes:
+      label: Requires network access (y/n)
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
+  - type: dropdown
+    id: requires-external-infrastructure
+    attributes:
+      label: Requires external infrastructure (y/n)
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
+  - type: dropdown
+    id: artifact-status
+    attributes:
+      label: Experimental or proposed-canonical
+      options:
+        - experimental
+        - proposed-canonical
+    validations:
+      required: true
