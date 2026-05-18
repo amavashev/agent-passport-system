@@ -217,6 +217,12 @@ export interface ToolManifest {
   publisherDid?: string
   /** How the publisher key is resolved (D1). Default when absent: APS-native. */
   trustRoot?: ToolTrustRoot
+  /** Asserted attestor identity (DID). When present, the manifest signature
+   *  is verified against the RESOLVED attestor key — a caller-supplied
+   *  `attestorPublicKey` cannot override or substitute for it. */
+  attestorDid?: string
+  /** How the attestor key is resolved (D1). Default when absent: APS-native. */
+  attestorTrustRoot?: ToolTrustRoot
   /** Monotonic integer; bumped on every substantive revision. */
   metadataVersion: number
   /** Approval state — `pending-reapproval` blocks verification. */
@@ -246,8 +252,17 @@ export interface NamespaceClaim {
 export interface ToolManifestResult {
   /** All checks passed */
   valid: boolean
-  /** Attestor signature over the manifest body is valid */
+  /** Attestor signature over the manifest body is valid (against the
+   *  authoritative key — resolved when attestorDid is set, else the
+   *  caller-supplied attestorPublicKey) */
   attestorSignatureValid: boolean
+  /** Manifest signature verified against a RESOLVED attestor identity.
+   *  True only when `attestorDid` is asserted, resolves, and the signature
+   *  checks out. False when no attestorDid is asserted (no DID binding). */
+  attestorVerified: boolean
+  /** How the attestor key was resolved, or `caller-supplied-key` when no
+   *  attestorDid is asserted */
+  attestorResolutionMethod: string
   /** Implementation hash matched (true if no current implementation supplied) */
   implementationVerified: boolean
   /** Metadata hash matched (true if no current metadata supplied) */
@@ -391,6 +406,11 @@ export function createToolManifest(input: {
   /** Metadata block to hash (distinct from the implementation) */
   metadata: ToolMetadata
   attestorPrivateKey: string
+  /** Asserted attestor identity (DID) — when set, the manifest carries it and
+   *  verification binds the signature to the resolved attestor key */
+  attestorDid?: string
+  /** Trust root for resolving the attestor key, optional */
+  attestorTrustRoot?: ToolTrustRoot
   /** Asserted publisher identity, optional */
   publisherDid?: string
   /** Trust root for resolving the publisher key, optional */
@@ -411,6 +431,8 @@ export function createToolManifest(input: {
     metadataHash: hashMetadata(input.metadata),
     publisherDid: input.publisherDid,
     trustRoot: input.trustRoot,
+    attestorDid: input.attestorDid,
+    attestorTrustRoot: input.attestorTrustRoot,
     metadataVersion: input.metadataVersion ?? 1,
     approvalState: input.approvalState ?? 'approved',
     verifiedAt: input.verifiedAt ?? new Date().toISOString(),
@@ -431,8 +453,10 @@ export function createToolManifest(input: {
  */
 export async function verifyToolManifest(input: {
   manifest: ToolManifest
-  /** Attestor public key for the manifest signature */
-  attestorPublicKey: string
+  /** Attestor public key — used ONLY when the manifest asserts no
+   *  `attestorDid`. When `attestorDid` is set the resolved key is
+   *  authoritative and this key cannot override or substitute for it (G1). */
+  attestorPublicKey?: string
   /** Current implementation to hash-check, optional */
   currentImplementation?: string | Buffer
   /** Current metadata to hash-check, optional */
@@ -446,9 +470,35 @@ export async function verifyToolManifest(input: {
   const errors: string[] = []
   const canon = canonicalManifestBody(m)
 
-  // 1. Attestor signature over the canonical manifest body.
-  const attestorSignatureValid = verify(canon, m.signature, input.attestorPublicKey)
-  if (!attestorSignatureValid) errors.push('Tool manifest attestor signature invalid')
+  // 1. Attestor signature. When the manifest asserts an `attestorDid`, the
+  //    RESOLVED attestor key is authoritative (G1) — a caller-supplied
+  //    `attestorPublicKey` cannot override or substitute for it, which is the
+  //    whole point of binding. Without an `attestorDid`, the pass-1 behaviour
+  //    holds: verify against the caller-supplied key.
+  let attestorSignatureValid = false
+  let attestorVerified = false
+  let attestorResolutionMethod = 'caller-supplied-key'
+  if (m.attestorDid !== undefined) {
+    const resolved = await resolveTrustRootKey(m.attestorDid, m.attestorTrustRoot, {
+      didWebResolver: input.didWebResolver,
+    })
+    attestorResolutionMethod = resolved.method
+    if (!resolved.publicKey) {
+      // External trust roots can fail to resolve — a clean fail, never a throw.
+      errors.push(`Attestor key resolution failed: ${resolved.error ?? 'unknown'}`)
+    } else {
+      attestorSignatureValid = verify(canon, m.signature, resolved.publicKey)
+      attestorVerified = attestorSignatureValid
+      if (!attestorSignatureValid) {
+        errors.push('Tool manifest attestor signature invalid (resolved attestor key)')
+      }
+    }
+  } else if (input.attestorPublicKey !== undefined) {
+    attestorSignatureValid = verify(canon, m.signature, input.attestorPublicKey)
+    if (!attestorSignatureValid) errors.push('Tool manifest attestor signature invalid')
+  } else {
+    errors.push('No attestorDid on manifest and no attestorPublicKey supplied')
+  }
 
   // 2. Implementation hash — only when a current implementation is supplied.
   let implementationVerified = true
@@ -513,6 +563,8 @@ export async function verifyToolManifest(input: {
   return {
     valid: errors.length === 0,
     attestorSignatureValid,
+    attestorVerified,
+    attestorResolutionMethod,
     implementationVerified,
     metadataVerified,
     publisherVerified,
@@ -570,16 +622,25 @@ export async function verifyNamespaceClaim(
  * manifest. If neither hash changed it is not a substantive revision and the
  * version / approval state are unchanged.
  *
- * Attestor-only operation. A prior publisherSignature is over the old body
- * and cannot carry forward, so it is dropped; a publisher re-asserts via
- * `createToolManifest` if the revised manifest needs publisher verification.
+ * The attestor identity (`attestorDid` / `attestorTrustRoot`) is carried
+ * forward. If the previous manifest asserts a `publisherDid`, a
+ * `publisherPrivateKey` MUST be supplied so the publisher field is re-signed
+ * over the revised body — revising a publisher-bearing manifest without it
+ * throws rather than emit a manifest with a stale publisher signature.
  */
 export function reviseToolManifest(
   prevManifest: ToolManifest,
   changes: { implementation?: string | Buffer; metadata?: ToolMetadata },
   attestorPrivateKey: string,
-  opts?: { verifiedAt?: string },
+  opts?: { verifiedAt?: string; publisherPrivateKey?: string },
 ): ToolManifest {
+  if (prevManifest.publisherDid !== undefined && !opts?.publisherPrivateKey) {
+    throw new Error(
+      'reviseToolManifest: this manifest asserts a publisherDid; a ' +
+      'publisherPrivateKey is required to re-sign the publisher field over ' +
+      'the revised body',
+    )
+  }
   const implementationHash = changes.implementation !== undefined
     ? hashImplementation(changes.implementation)
     : prevManifest.implementationHash
@@ -598,31 +659,64 @@ export function reviseToolManifest(
     metadataHash,
     publisherDid: prevManifest.publisherDid,
     trustRoot: prevManifest.trustRoot,
+    attestorDid: prevManifest.attestorDid,
+    attestorTrustRoot: prevManifest.attestorTrustRoot,
     metadataVersion: substantive ? prevManifest.metadataVersion + 1 : prevManifest.metadataVersion,
     approvalState: substantive ? 'pending-reapproval' : prevManifest.approvalState,
     verifiedAt: opts?.verifiedAt ?? new Date().toISOString(),
   }
-  return { ...body, signature: sign(canonicalize(body), attestorPrivateKey) }
+  const canon = canonicalize(body)
+  const publisherSignature = prevManifest.publisherDid !== undefined
+    ? sign(canon, opts!.publisherPrivateKey!)
+    : undefined
+  return { ...body, signature: sign(canon, attestorPrivateKey), publisherSignature }
 }
 
 /**
- * Re-approve a manifest that is pending re-approval (Part 3). Only an attestor
- * can move `pending-reapproval` -> `approved`, with a fresh `verifiedAt` and a
- * fresh attestor signature. Throws if the manifest is not pending re-approval.
+ * Re-approve a manifest pending re-approval (Part 3). Only an attestor can move
+ * `pending-reapproval` -> `approved`.
+ *
+ * The approval is bound to a resolved attestor identity, not merely any
+ * caller-provided keypair: the returned manifest carries `attestorDid` /
+ * `attestorTrustRoot`, and its signature then verifies against the resolved
+ * attestor key in `verifyToolManifest`. If `opts.attestorDid` is omitted the
+ * attestor identity already on the manifest is carried forward.
+ *
+ * If the manifest asserts a `publisherDid`, a `publisherPrivateKey` is required
+ * so the publisher field is re-signed over the approved body. Throws if the
+ * manifest is not pending re-approval, or on a missing required publisher key.
  */
 export function reapproveToolManifest(
   manifest: ToolManifest,
-  attestorPrivateKey: string,
-  opts?: { verifiedAt?: string },
+  opts: {
+    attestorPrivateKey: string
+    attestorDid?: string
+    attestorTrustRoot?: ToolTrustRoot
+    publisherPrivateKey?: string
+    verifiedAt?: string
+  },
 ): ToolManifest {
   if (manifest.approvalState !== 'pending-reapproval') {
     throw new Error('reapproveToolManifest: manifest is not pending re-approval')
   }
+  if (manifest.publisherDid !== undefined && !opts.publisherPrivateKey) {
+    throw new Error(
+      'reapproveToolManifest: this manifest asserts a publisherDid; a ' +
+      'publisherPrivateKey is required to re-sign the publisher field over ' +
+      'the approved body',
+    )
+  }
   const { signature: _s, publisherSignature: _p, ...rest } = manifest
   const body: Omit<ToolManifest, 'signature' | 'publisherSignature'> = {
     ...rest,
+    attestorDid: opts.attestorDid ?? manifest.attestorDid,
+    attestorTrustRoot: opts.attestorTrustRoot ?? manifest.attestorTrustRoot,
     approvalState: 'approved',
-    verifiedAt: opts?.verifiedAt ?? new Date().toISOString(),
+    verifiedAt: opts.verifiedAt ?? new Date().toISOString(),
   }
-  return { ...body, signature: sign(canonicalize(body), attestorPrivateKey) }
+  const canon = canonicalize(body)
+  const publisherSignature = manifest.publisherDid !== undefined
+    ? sign(canon, opts.publisherPrivateKey!)
+    : undefined
+  return { ...body, signature: sign(canon, opts.attestorPrivateKey), publisherSignature }
 }

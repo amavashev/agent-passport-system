@@ -471,7 +471,7 @@ describe('Part 3 — re-approval on metadata change', () => {
     const m2 = reviseToolManifest(m1, { implementation: 'src-v2' }, att.privateKey)
     assert.equal((await verifyToolManifest({ manifest: m2, attestorPublicKey: att.publicKey })).valid, false)
 
-    const m3 = reapproveToolManifest(m2, att.privateKey)
+    const m3 = reapproveToolManifest(m2, { attestorPrivateKey: att.privateKey })
     assert.equal(m3.approvalState, 'approved')
     const r = await verifyToolManifest({ manifest: m3, attestorPublicKey: att.publicKey })
     assert.equal(r.reapprovalRequired, false)
@@ -485,7 +485,7 @@ describe('Part 3 — re-approval on metadata change', () => {
       toolName: 'web_search', implementation: 'src-v1', metadata: META,
       attestorPrivateKey: att.privateKey,
     })
-    assert.throws(() => reapproveToolManifest(m1, att.privateKey), /not pending re-approval/)
+    assert.throws(() => reapproveToolManifest(m1, { attestorPrivateKey: att.privateKey }), /not pending re-approval/)
   })
 })
 
@@ -534,4 +534,190 @@ describe('Part 4 — conformance vectors', () => {
       })
     }
   }
+})
+
+// ══════════════════════════════════════════════════════════════════
+// Pass 2 — attestor identity binding (close the attestor-binding gap)
+// ══════════════════════════════════════════════════════════════════
+describe('Attestor binding — DID-resolved attestor identity', () => {
+  it('a manifest with attestorDid verifies against the RESOLVED key (no attestorPublicKey needed)', async () => {
+    const att = generateKeyPair()
+    const did = toDIDKey(att.publicKey)
+    const m = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: att.privateKey,
+      attestorDid: did, attestorTrustRoot: { type: 'aps', ref: did },
+    })
+    const r = await verifyToolManifest({ manifest: m })   // no attestorPublicKey supplied
+    assert.equal(r.attestorVerified, true)
+    assert.equal(r.attestorSignatureValid, true)
+    assert.equal(r.attestorResolutionMethod, 'aps-native-did')
+    assert.equal(r.valid, true)
+  })
+
+  // G2 — the named adversarial test: the precise hole pass 1 left open.
+  it('attestor binding: signature by wrong key fails even if that key is passed as attestorPublicKey', async () => {
+    const att = generateKeyPair()       // the identity the manifest claims
+    const attacker = generateKeyPair()  // whoever actually holds a key
+    const did = toDIDKey(att.publicKey)
+    // Manifest claims attestorDid = att, but m.signature is the attacker's.
+    const m = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: attacker.privateKey,           // forged signer
+      attestorDid: did, attestorTrustRoot: { type: 'aps', ref: did },
+    })
+    // The verifier is handed the attacker's OWN public key — pass-1 would go green.
+    const r = await verifyToolManifest({ manifest: m, attestorPublicKey: attacker.publicKey })
+    assert.equal(r.attestorVerified, false)
+    assert.equal(r.attestorSignatureValid, false)
+    assert.equal(r.valid, false)
+    assert.equal(r.attestorResolutionMethod, 'aps-native-did')   // resolved path was used
+  })
+
+  it('G1: a caller-supplied attestorPublicKey cannot override or substitute for attestorDid', async () => {
+    const att = generateKeyPair()
+    const attacker = generateKeyPair()
+    const did = toDIDKey(att.publicKey)
+    const m = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: attacker.privateKey,
+      attestorDid: did, attestorTrustRoot: { type: 'aps', ref: did },
+    })
+    // the key that DOES match m.signature must not satisfy verification
+    assert.equal((await verifyToolManifest({ manifest: m, attestorPublicKey: attacker.publicKey })).valid, false)
+    // the legitimate key cannot rescue a forged signature either
+    assert.equal((await verifyToolManifest({ manifest: m, attestorPublicKey: att.publicKey })).valid, false)
+  })
+
+  it('G1: no attestorDid keeps pass-1 behaviour (caller-supplied key path)', async () => {
+    const att = generateKeyPair()
+    const m = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: att.privateKey,                 // no attestorDid asserted
+    })
+    const r = await verifyToolManifest({ manifest: m, attestorPublicKey: att.publicKey })
+    assert.equal(r.valid, true)
+    assert.equal(r.attestorSignatureValid, true)
+    assert.equal(r.attestorVerified, false)               // no DID binding to verify
+    assert.equal(r.attestorResolutionMethod, 'caller-supplied-key')
+  })
+
+  it('raw-key attestor trust root: ref is the trusted key and is used as the resolved key', async () => {
+    const att = generateKeyPair()
+    const m = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: att.privateKey,
+      attestorDid: 'did:example:registry-attestor',
+      attestorTrustRoot: { type: 'raw-key', ref: att.publicKey },
+    })
+    const r = await verifyToolManifest({ manifest: m })
+    assert.equal(r.attestorVerified, true)
+    assert.equal(r.attestorResolutionMethod, 'raw-key')
+    assert.equal(r.valid, true)
+  })
+
+  it('wrong attestor trust root (raw-key holds a different key) fails', async () => {
+    const att = generateKeyPair()
+    const other = generateKeyPair()
+    const m = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: att.privateKey,
+      attestorDid: 'did:example:registry-attestor',
+      attestorTrustRoot: { type: 'raw-key', ref: other.publicKey },   // wrong key
+    })
+    const r = await verifyToolManifest({ manifest: m })
+    assert.equal(r.attestorVerified, false)
+    assert.equal(r.valid, false)
+  })
+
+  it('attestorDid present but trust root cannot resolve: clean fail, not a throw, not a silent pass', async () => {
+    const att = generateKeyPair()
+    const m = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: att.privateKey,
+      attestorDid: 'did:web:attestor.example',
+      attestorTrustRoot: { type: 'did:web', ref: 'did:web:attestor.example' },
+    })
+    const r = await verifyToolManifest({
+      manifest: m,
+      didWebResolver: async () => { throw new Error('network down') },
+    })
+    assert.equal(r.attestorVerified, false)
+    assert.equal(r.attestorResolutionMethod, 'did:web')
+    assert.equal(r.valid, false)
+    assert.ok(r.errors.some(e => e.includes('Attestor key resolution failed')))
+  })
+
+  it('valid attestor re-approval passes; a random attestor re-approval fails', async () => {
+    const att = generateKeyPair()
+    const did = toDIDKey(att.publicKey)
+    const trustRoot = { type: 'aps' as const, ref: did }
+    const m1 = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: att.privateKey, attestorDid: did, attestorTrustRoot: trustRoot,
+    })
+    const m2 = reviseToolManifest(m1, { implementation: 'src-v2' }, att.privateKey)
+    assert.equal(m2.approvalState, 'pending-reapproval')
+
+    // pending-reapproval still fails before approval
+    assert.equal((await verifyToolManifest({ manifest: m2 })).valid, false)
+
+    const good = reapproveToolManifest(m2, {
+      attestorPrivateKey: att.privateKey, attestorDid: did, attestorTrustRoot: trustRoot,
+    })
+    const rGood = await verifyToolManifest({ manifest: good })
+    assert.equal(rGood.attestorVerified, true)
+    assert.equal(rGood.reapprovalRequired, false)
+    assert.equal(rGood.valid, true)
+
+    // random attestor: re-approves with a stranger key while still claiming
+    // attestorDid = att -> the resolved (att) key rejects the stranger signature
+    const stranger = generateKeyPair()
+    const forged = reapproveToolManifest(m2, {
+      attestorPrivateKey: stranger.privateKey, attestorDid: did, attestorTrustRoot: trustRoot,
+    })
+    const rForged = await verifyToolManifest({ manifest: forged })
+    assert.equal(rForged.attestorVerified, false)
+    assert.equal(rForged.valid, false)
+  })
+
+  it('publisher + reapproval compose end-to-end — both identities verify', async () => {
+    const att = generateKeyPair()
+    const pub = generateKeyPair()
+    const attDid = toDIDKey(att.publicKey)
+    const pubDid = toDIDKey(pub.publicKey)
+    const attRoot = { type: 'aps' as const, ref: attDid }
+    const pubRoot = { type: 'aps' as const, ref: pubDid }
+
+    const m1 = createToolManifest({
+      toolName: 'web_search', implementation: 'src-v1', metadata: META,
+      attestorPrivateKey: att.privateKey, attestorDid: attDid, attestorTrustRoot: attRoot,
+      publisherDid: pubDid, trustRoot: pubRoot, publisherPrivateKey: pub.privateKey,
+    })
+
+    // revising a publisher-bearing manifest WITHOUT a publisher key must throw
+    assert.throws(
+      () => reviseToolManifest(m1, { implementation: 'src-v2' }, att.privateKey),
+      /publisherPrivateKey is required/,
+    )
+    const m2 = reviseToolManifest(m1, { implementation: 'src-v2' }, att.privateKey, {
+      publisherPrivateKey: pub.privateKey,
+    })
+    assert.equal(m2.approvalState, 'pending-reapproval')
+
+    // re-approving a publisher-bearing manifest WITHOUT a publisher key must throw
+    assert.throws(
+      () => reapproveToolManifest(m2, { attestorPrivateKey: att.privateKey }),
+      /publisherPrivateKey is required/,
+    )
+    const m3 = reapproveToolManifest(m2, {
+      attestorPrivateKey: att.privateKey, attestorDid: attDid, attestorTrustRoot: attRoot,
+      publisherPrivateKey: pub.privateKey,
+    })
+    const r = await verifyToolManifest({ manifest: m3 })
+    assert.equal(r.publisherVerified, true)
+    assert.equal(r.attestorVerified, true)
+    assert.equal(r.reapprovalRequired, false)
+    assert.equal(r.valid, true)
+  })
 })
