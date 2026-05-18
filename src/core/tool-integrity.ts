@@ -72,7 +72,7 @@ export function createToolRegistryEntry(input: {
   attestorPrivateKey: string
 }): ToolRegistryEntry {
   const implHash = createHash('sha256')
-    .update(typeof input.implementation === 'string' ? input.implementation : input.implementation)
+    .update(input.implementation)
     .digest('hex')
 
   const now = new Date().toISOString()
@@ -118,7 +118,7 @@ export function verifyToolIntegrity(input: {
 
   // 2. Verify implementation hash matches
   const currentHash = `sha256:${createHash('sha256')
-    .update(typeof input.currentImplementation === 'string' ? input.currentImplementation : input.currentImplementation)
+    .update(input.currentImplementation)
     .digest('hex')}`
   const implementationVerified = currentHash === input.registryEntry.implementationHash
   if (!implementationVerified) {
