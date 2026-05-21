@@ -242,8 +242,10 @@ export interface CyclesDenial {
 export type CyclesVerifyReason =
   | 'INVALID_CLAIM_TYPE'
   | 'INVALID_SCHEMA_VERSION'
+  | 'INVALID_RAIL_NAME'
   | 'MISSING_REQUIRED_FIELD'
   | 'SIGNATURE_INVALID'
+  | 'EXPIRED'
   | 'EVIDENCE_REF_HASH_MISMATCH'
   | 'DID_RESOLVER_MISSING'
   | 'DID_URI_INVALID'
@@ -254,3 +256,68 @@ export type CyclesVerifyReason =
 export type CyclesVerifyResult =
   | { valid: true }
   | { valid: false; reason: CyclesVerifyReason; detail?: string }
+
+// ── Sign-function input shapes (mirror the mpp/x402 pattern) ──────
+
+export interface SignCyclesPermitReceiptInput {
+  agent_id: string
+  delegation_ref: string
+  action_ref: string
+  reservation_id: string
+  reserved: { unit: string; amount: number }
+  decision: 'ALLOW' | 'ALLOW_WITH_CAPS'
+  expires_at_ms?: number
+  cycles_evidence: CyclesEvidenceRef
+  /** Override the rail's default scope_of_claim. */
+  scope_of_claim?: ScopeOfClaim
+  /** When supplied alongside `issuer_key_ref`, signer becomes a DID URI
+   *  of the form `${issuer_agent_id}#${issuer_key_ref}`. Otherwise the
+   *  signer is the raw hex pubkey derived from the private key. */
+  issuer_agent_id?: string
+  issuer_key_ref?: string
+}
+
+export interface SignCyclesReleaseReceiptInput {
+  agent_id: string
+  delegation_ref: string
+  action_ref: string
+  reservation_id: string
+  released: { unit: string; amount: number }
+  /** Optional reason from the ReleaseRequest body. */
+  reason?: string
+  cycles_evidence: CyclesEvidenceRef
+  scope_of_claim?: ScopeOfClaim
+  issuer_agent_id?: string
+  issuer_key_ref?: string
+}
+
+export interface SignCyclesDenialInput {
+  agent_id: string
+  delegation_ref: string
+  action_ref: string
+  /** APS Tier-1 reason — must be a member of `DenialReason` from
+   *  payment-rails/types.ts. Runtime validation against
+   *  VALID_DENIAL_REASONS at hooks.ts:87-94. */
+  denial_reason: string
+  cycles: { denial_detail: CyclesDenialDetail }
+  cycles_evidence: CyclesEvidenceRef
+  scope_of_claim?: ScopeOfClaim
+  issuer_agent_id?: string
+  issuer_key_ref?: string
+}
+
+// ── Verify-options shape ──────────────────────────────────────────
+
+export interface VerifyCyclesOptions {
+  now?: Date
+  ttl_seconds?: number
+  expected_signer?: string
+  /** Required when signer is a DID URI. Sync verify paths return
+   *  DID_RESOLVER_MISSING; pass this to the *WithDID async paths. */
+  resolveDidDocument?: CyclesResolveDidDocument
+}
+
+/** DID document resolver — mirrors MppResolveDidDocument. */
+export type CyclesResolveDidDocument = (
+  agentId: string,
+) => Promise<import('../../../types/passport.js').RotatableDIDDocument | null>
