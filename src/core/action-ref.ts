@@ -16,7 +16,8 @@
 // produce the same action_ref.
 // ══════════════════════════════════════════════════════════════════
 
-import { canonicalHash, normalizeTimestamp } from './canonical.js'
+import { normalizeTimestamp } from './canonical.js'
+import { canonicalHashJCS } from './canonical-jcs.js'
 import type { ActionIntent } from '../types/policy.js'
 
 /**
@@ -25,11 +26,16 @@ import type { ActionIntent } from '../types/policy.js'
  * Inputs hashed: agentId, action.type, action.scopeRequired, normalized timestamp.
  * Timestamp defaults to intent.createdAt; falls back to current time.
  *
+ * Canonicalization follows RFC 8785 JCS strictly, per draft-pidlisnyi-aps-00
+ * §4.1: null/undefined-valued keys are preserved (not stripped) so that
+ * cross-engine correlation byte-matches against any other strict-JCS
+ * implementation (x402 ecosystem, AgentGraph CTEF, Nobulex, etc.).
+ *
  * Returns: lowercase hex SHA-256 digest.
  */
 export function computeActionRef(intent: Pick<ActionIntent, 'agentId' | 'action' | 'createdAt'>): string {
   const ts = intent.createdAt ?? new Date().toISOString()
-  return canonicalHash({
+  return canonicalHashJCS({
     agentId: intent.agentId,
     actionType: intent.action.type,
     scopeRequired: intent.action.scopeRequired,

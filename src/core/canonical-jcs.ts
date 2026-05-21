@@ -92,6 +92,14 @@ function sha256hex(input: string): string {
   return createHash('sha256').update(input, 'utf-8').digest('hex')
 }
 
+/** SHA-256 (lowercase hex) of canonicalizeJCS(obj). Strict-RFC-8785
+ *  counterpart of canonicalHash() from ./canonical.ts. Use this for any
+ *  cross-implementation hash whose conformance pin requires strict JCS
+ *  (e.g. action_ref per draft-pidlisnyi-aps-00 §4.1). */
+export function canonicalHashJCS(obj: Record<string, unknown>): string {
+  return sha256hex(canonicalizeJCS(obj))
+}
+
 /** Built-in test vectors for cross-language verification */
 export function getTestVectors(): CanonicalizationTestVector[] {
   const vectors: CanonicalizationTestVector[] = []

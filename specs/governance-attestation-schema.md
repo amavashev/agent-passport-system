@@ -159,10 +159,12 @@ The `governance_attestation` signal is emitted alongside Sig 2 — it is the mac
 
 ### 2.3 Canonicalization
 
-Canonicalization follows RFC 8785 (JCS) with `src/core/canonical.ts`:
+Canonicalization uses **aps-canonical-json** (sorted-keys, null-stripped), implemented in `src/core/canonical.ts`. This is a near-JCS profile that strips `null`/`undefined`-valued object keys before serializing. For strict RFC 8785 JCS, see `src/core/canonical-jcs.ts`.
+
 - UTF-8
 - Sorted object keys
 - No insignificant whitespace
+- `null`/`undefined`-valued object keys omitted (divergence from strict RFC 8785)
 - Numbers in shortest round-trippable form
 - Timestamps normalized to second-precision ISO 8601 UTC
 
@@ -356,7 +358,8 @@ console.log('attested constraints:', result.claim.active_constraints)
 - `src/core/policy.ts` — 3-signature chain implementation (`createActionIntent`, `evaluateIntent`, `createPolicyReceipt`)
 - `src/types/policy.ts` — `ActionIntent`, `PolicyDecision`, `PolicyReceipt` type definitions
 - `src/core/attestation.ts` — `computePassportGrade`, `classifyEvidenceQuality`
-- `src/core/canonical.ts` — RFC 8785 canonicalization
+- `src/core/canonical.ts` — aps-canonical-json (sorted-keys, null-stripped); near-JCS, not strict RFC 8785
+- `src/core/canonical-jcs.ts` — strict RFC 8785 JCS canonicalization
 - Gateway `/api/v1/public/trust/:agentId` — `active_constraints` source
 - Gateway `/api/v1/public/trust/:agentId/attestation` — signed JWS envelope
 - Gateway `/.well-known/jwks.json` — EdDSA verification keys

@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.6.0-alpha.4 (unreleased)
+
+### Fixed
+- **`computeActionRef` is now strict RFC 8785 JCS** per
+  `draft-pidlisnyi-aps-00` §4.1. The action_ref pre-image is now hashed
+  via `canonicalHashJCS()` (new export from `src/core/canonical-jcs.ts`)
+  instead of the legacy null-stripping `canonicalHash()`. Behaviour is
+  byte-identical to the prior release for every input whose four-field
+  pre-image (`agentId`, `actionType`, `scopeRequired`, `timestamp`)
+  contains no null/undefined values — i.e. every production input.
+  Inputs that did carry a null pre-image field previously produced
+  hashes that diverged from any strict-JCS verifier in the ecosystem
+  (x402, AgentGraph CTEF, Nobulex); they now byte-match. Full test
+  suite passes unchanged (2965/2965, +1 new conformance test).
+  Internal call sites (`policy.ts`, `execution-envelope.ts`) inherit
+  the fix transitively. `computeAttributionActionRef` uses a separate
+  spec (ATTRIBUTION-PRIMITIVE-v1.1) and is unchanged in this release.
+
 ## 2.3.0-alpha (unreleased)
 
 Reference implementation of

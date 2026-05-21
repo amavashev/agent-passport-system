@@ -61,6 +61,23 @@ describe('action_ref — Content-Addressed Request Identity (A2A#1672)', () => {
     assert.ok(!actionRefsMatch(ref, 'different'))
     assert.ok(!actionRefsMatch('', ''))
   })
+
+  it('action_ref preserves null-valued keys per RFC 8785', () => {
+    // Strict-JCS conformance pin per draft-pidlisnyi-aps-00 §4.1. Null
+    // scopeRequired (or any null pre-image field) MUST be preserved in
+    // the canonical bytes — not stripped — so the action_ref byte-matches
+    // any other strict-JCS implementation (x402 ecosystem, AgentGraph CTEF,
+    // Nobulex). The expected hash below is the SHA-256 of the strict
+    // canonical form, independently reproduced by canonicalize@3.0.0
+    // (erdtman, RFC 8785 author) and rfc8785@0.1.4 (PyPI).
+    const intent = {
+      agentId: 'a',
+      action: { type: 't', target: '-', scopeRequired: null as unknown as string },
+      createdAt: '2026-05-21T00:00:00Z',
+    }
+    const expected = '0c7573a9f120b37bda5648bea097181bf3261c0739c2f465fb878879c21c4c47'
+    assert.equal(computeActionRef(intent), expected)
+  })
 })
 
 describe('action_ref integration — createActionIntent + createPolicyReceipt', () => {
