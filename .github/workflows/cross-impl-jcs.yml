@@ -1,0 +1,100 @@
+name: cross-impl JCS byte-match
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/core/canonical.ts"
+      - "src/core/canonical-jcs.ts"
+      - "src/core/action-ref.ts"
+      - "src/v2/attribution-primitive/**"
+      - "tests/cross-impl/**"
+      - ".github/workflows/cross-impl-jcs.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/core/canonical.ts"
+      - "src/core/canonical-jcs.ts"
+      - "src/core/action-ref.ts"
+      - "src/v2/attribution-primitive/**"
+      - "tests/cross-impl/**"
+      - ".github/workflows/cross-impl-jcs.yml"
+  workflow_dispatch: {}
+
+jobs:
+  byte-match:
+    name: SDK ↔ canonicalize@3.0.0 ↔ rfc8785@0.1.4
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Node deps
+        run: npm ci || npm install
+
+      - name: Install rfc8785@0.1.4 (Python reference)
+        run: python -m pip install --upgrade pip && pip install "rfc8785==0.1.4"
+
+      - name: TS test — SDK canonicalizeJCS vs canonicalize@3.0.0 (erdtman)
+        run: npm run test:cross-impl
+
+      - name: Python test — rfc8785@0.1.4 vs pinned manifest
+        # Regenerates pinned canonical bytes + SHA-256 from rfc8785@0.1.4
+        # and asserts every value matches the committed manifest byte-for-byte.
+        # A mismatch here means EITHER the pinned manifest has drifted from
+        # strict RFC 8785, OR rfc8785@0.1.4's behaviour has shifted (which
+        # would also break partner verifiers downstream of us). Either is a
+        # signal worth surfacing as a hard CI failure.
+        run: |
+          python - <<'PY'
+          import hashlib, json, sys, pathlib
+
+          import rfc8785
+
+          repo_root = pathlib.Path('.')
+          manifest = json.loads((repo_root / 'tests' / 'cross-impl' / 'jcs-test-vectors.json').read_text())
+
+          fail = 0
+          for v in manifest['vectors']:
+              ref_bytes = rfc8785.dumps(v['input'])
+              ref_str = ref_bytes.decode('utf-8') if isinstance(ref_bytes, bytes) else ref_bytes
+              ref_hash = hashlib.sha256(ref_str.encode('utf-8')).hexdigest()
+              if ref_str != v['expected_canonical_bytes']:
+                  print(f"FAIL {v['id']}: bytes mismatch")
+                  print(f"  pinned: {v['expected_canonical_bytes']}")
+                  print(f"  rfc8785: {ref_str}")
+                  fail += 1
+              if ref_hash != v['expected_sha256']:
+                  print(f"FAIL {v['id']}: sha256 mismatch")
+                  print(f"  pinned: {v['expected_sha256']}")
+                  print(f"  rfc8785: {ref_hash}")
+                  fail += 1
+          total = len(manifest['vectors'])
+          if fail:
+              print(f"\nFAILED: {fail} divergence(s) across {total} vectors")
+              sys.exit(1)
+          print(f"\nOK: rfc8785@0.1.4 byte-matches all {total} pinned vectors")
+          PY
+
+      - name: Three-way assertion (SDK ≡ erdtman ≡ rfc8785)
+        # The TS test covers SDK ≡ erdtman. The Python step above covers
+        # rfc8785 ≡ pinned manifest (which the TS test also pins to). So
+        # all three agree by transitivity. This step prints the summary
+        # line so the conformance signal is visible at a glance in CI logs.
+        run: |
+          echo "TS test:  SDK canonicalizeJCS ≡ canonicalize@3.0.0 (erdtman, RFC 8785 author)"
+          echo "Py test:  rfc8785@0.1.4 ≡ pinned manifest"
+          echo "Pinned:   manifest pinned to canonicalize@3.0.0 + rfc8785@0.1.4 byte-match"
+          echo "Therefore SDK ≡ canonicalize@3.0.0 ≡ rfc8785@0.1.4 byte-for-byte."

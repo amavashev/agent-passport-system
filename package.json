@@ -24,6 +24,7 @@
     "test:interop": "npx tsx --test tests/interop/ietf-envelope.test.ts tests/interop/signet-combined.test.ts tests/interop/moltrust-attestation.test.ts tests/interop/cross-protocol-vectors.test.ts tests/interop/receipt-chaining.test.ts",
     "test:quick": "tsx --test tests/passport.test.ts",
     "test:fixtures": "tsx fixtures/bilateral-delegation/test-canonicalize.ts",
+    "test:cross-impl": "npx tsx --test tests/cross-impl/jcs-equivalence.test.ts",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build && npm test",
@@ -41,6 +42,7 @@
     "@types/libsodium-wrappers": "^0.7.14",
     "@types/node": "^20.11.0",
     "@types/uuid": "^9.0.7",
+    "canonicalize": "3.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   },
