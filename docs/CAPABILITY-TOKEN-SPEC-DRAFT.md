@@ -295,7 +295,7 @@ Questions this draft does not resolve. Each affects the final wire format; each 
 - `corpollc/qntm#7`: consolidation thread where Hensley coined the FRCBE primitive name.
 - `OWASP/www-project-top-10-for-large-language-model-applications#817`: BBIS classification grammar discussion; source for the closed / bounded / partial / detectable-only / theater ladder adopted in this draft.
 - `RFC 8785`: JSON Canonicalization Scheme (JCS), used for all signed object serialization.
-- `draft-pidlisnyi-aps-00`: Agent Passport System IETF Internet-Draft, delegation envelope format.
+- `draft-pidlisnyi-aps-01`: Agent Passport System IETF Internet-Draft, delegation envelope format.
 
 ## Revision History
 

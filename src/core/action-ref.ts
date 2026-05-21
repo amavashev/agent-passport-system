@@ -26,7 +26,7 @@ import type { ActionIntent } from '../types/policy.js'
  * Inputs hashed: agentId, action.type, action.scopeRequired, normalized timestamp.
  * Timestamp defaults to intent.createdAt; falls back to current time.
  *
- * Canonicalization follows RFC 8785 JCS strictly, per draft-pidlisnyi-aps-00
+ * Canonicalization follows RFC 8785 JCS strictly, per draft-pidlisnyi-aps-01
  * §4.1: null/undefined-valued keys are preserved (not stripped) so that
  * cross-engine correlation byte-matches against any other strict-JCS
  * implementation (x402 ecosystem, AgentGraph CTEF, Nobulex, etc.).

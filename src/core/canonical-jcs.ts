@@ -95,7 +95,7 @@ function sha256hex(input: string): string {
 /** SHA-256 (lowercase hex) of canonicalizeJCS(obj). Strict-RFC-8785
  *  counterpart of canonicalHash() from ./canonical.ts. Use this for any
  *  cross-implementation hash whose conformance pin requires strict JCS
- *  (e.g. action_ref per draft-pidlisnyi-aps-00 §4.1). */
+ *  (e.g. action_ref per draft-pidlisnyi-aps-01 §4.1). */
 export function canonicalHashJCS(obj: Record<string, unknown>): string {
   return sha256hex(canonicalizeJCS(obj))
 }

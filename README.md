@@ -155,7 +155,7 @@ The composition contract specifies how a verifier MUST cross-check per-request s
 - [Governance in the Medium](https://doi.org/10.5281/zenodo.19582550)
 - [Cognitive Attestation](https://doi.org/10.5281/zenodo.19646276)
 - [The Evidence-Safety Gap](https://doi.org/10.5281/zenodo.19914628)
-- IETF Internet-Draft: `draft-pidlisnyi-aps-00`
+- IETF Internet-Draft: `draft-pidlisnyi-aps-01`
 
 ## Contributing
 

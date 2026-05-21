@@ -63,7 +63,7 @@ describe('action_ref — Content-Addressed Request Identity (A2A#1672)', () => {
   })
 
   it('action_ref preserves null-valued keys per RFC 8785', () => {
-    // Strict-JCS conformance pin per draft-pidlisnyi-aps-00 §4.1. Null
+    // Strict-JCS conformance pin per draft-pidlisnyi-aps-01 §4.1. Null
     // scopeRequired (or any null pre-image field) MUST be preserved in
     // the canonical bytes — not stripped — so the action_ref byte-matches
     // any other strict-JCS implementation (x402 ecosystem, AgentGraph CTEF,
