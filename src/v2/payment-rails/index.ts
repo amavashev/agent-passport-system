@@ -336,3 +336,47 @@ export type {
   MppVerifyReason,
   MppVerifyResult,
 } from './mpp/types.js'
+
+// ── Cycles reference adapter (reserve/commit/release budget authority) ──
+// Implements APS governance over Cycles (runcycles.io) — a four-event
+// lifecycle (decide / reserve / commit / release) plus error envelope
+// for pre-execution budget and action-authority decisions. Emits
+// rail.budget_reservation.{permit,release,denial}.v1 receipts that
+// bind to CyclesEvidence envelopes by URL + content-hash, with the
+// closed-taxonomy denial mapping per runcycles/cycles-protocol#93.
+
+export {
+  CYCLES_PROTOCOL_VERSION,
+  CYCLES_EVIDENCE_SCHEMA_VERSION,
+  RAIL_BUDGET_RESERVATION_PERMIT_CLAIM_TYPE,
+  RAIL_BUDGET_RESERVATION_RELEASE_CLAIM_TYPE,
+  RAIL_BUDGET_RESERVATION_DENIAL_CLAIM_TYPE,
+  mapCyclesDenialToFoundation,
+  signCyclesPermitReceipt,
+  signCyclesReleaseReceipt,
+  signCyclesDenial,
+  verifyCyclesPermitReceipt,
+  verifyCyclesPermitReceiptWithDID,
+  verifyCyclesReleaseReceipt,
+  verifyCyclesReleaseReceiptWithDID,
+  verifyCyclesDenial,
+  verifyCyclesDenialWithDID,
+} from './cycles/index.js'
+export type {
+  CyclesArtifactType,
+  CyclesDecision,
+  CyclesDenial,
+  CyclesDenialDetail,
+  CyclesDenialSource,
+  CyclesEvidenceRef,
+  CyclesEvidenceView,
+  CyclesPermitReceipt,
+  CyclesReleaseReceipt,
+  CyclesResolveDidDocument,
+  CyclesVerifyReason,
+  CyclesVerifyResult,
+  SignCyclesDenialInput,
+  SignCyclesPermitReceiptInput,
+  SignCyclesReleaseReceiptInput,
+  VerifyCyclesOptions,
+} from './cycles/types.js'
