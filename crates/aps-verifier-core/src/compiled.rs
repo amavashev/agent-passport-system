@@ -156,7 +156,8 @@ pub struct CompiledAuthority {
     // Mode dispatch.
     pub durability_mode: DurabilityMode,
 
-    // Receipt stream (chunk 5 populates the real key).
+    // Receipt stream MAC key (HKDF-derived; see
+    // key_derivation::derive_receipt_stream_key).
     pub receipt_stream_key: [u8; 32],
 
     /// Spec §11.4 recovery floor. `0` is the no-recovery / fresh-start
@@ -240,8 +241,6 @@ impl CompiledAuthority {
     /// - `durability_mode` defaults to [`default_durability_for`] per
     ///   risk class (R0/R1 memory-buffered, R2/R3 blocking commit, R4
     ///   strict).
-    /// - `resource_trie`, the parsed approval rules, and
-    ///   `receipt_stream_key` are placeholders filled by chunks 3-5.
     pub fn from_passport(
         passport: &RuntimePassport,
         tool_registry: ToolRegistry,
