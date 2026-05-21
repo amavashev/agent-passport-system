@@ -8,6 +8,8 @@ license = "Apache-2.0"
 [dependencies]
 blake3 = "1"
 ed25519-dalek = "2"
+hkdf = "0.12"
+sha2 = "0.10"
 thiserror = "1"
 parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }

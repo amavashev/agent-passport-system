@@ -51,7 +51,8 @@ use thiserror::Error;
 use crate::approval::{
     operation_id_from_name, ApprovalCompileError, CompiledApprovalRule,
 };
-use crate::passport::{DurabilityMode, PassportError, RiskClass, RuntimePassport};
+use crate::key_derivation::derive_receipt_stream_key;
+use crate::passport::{decode_signature, DurabilityMode, PassportError, RiskClass, RuntimePassport};
 use crate::recovery::{recover_log, RecoveryError, RecoveryReport, RecoveryStatus};
 use crate::registry::ToolRegistry;
 use crate::resource_trie::TrieNode;
@@ -266,6 +267,19 @@ impl CompiledAuthority {
         let passport_id_hash = blake3_32(passport.passport_id.as_bytes());
         let verifier_instance_id_hash = blake3_32(passport.verifier_instance_id.as_bytes());
 
+        // Derive the rolling-MAC receipt stream key from passport-bound
+        // inputs. See `key_derivation::derive_receipt_stream_key` and
+        // the HKDF-DERIVATION-DESIGN memo for the construction.
+        let signature_bytes = decode_signature(&passport.signature)?;
+        let delegation_chain_hash_bytes = decode_hash_field(&passport.delegation_chain_hash)?;
+        let receipt_stream_key = derive_receipt_stream_key(
+            &signature_bytes,
+            &verifier_instance_id_hash,
+            &delegation_chain_hash_bytes,
+            &passport.receipt_stream_id,
+            passport.revocation_epoch,
+        );
+
         // Allowed operation mask (bit position == operation id, fixed
         // enum shared with `approval::operation_id_from_name`).
         let mut allowed_op_mask: u32 = 0;
@@ -329,7 +343,7 @@ impl CompiledAuthority {
             ))),
             approval_rules,
             durability_mode: default_durability_for(passport.risk_class),
-            receipt_stream_key: [0u8; 32],
+            receipt_stream_key,
             recovered_floor: AtomicU64::new(0),
         })
     }

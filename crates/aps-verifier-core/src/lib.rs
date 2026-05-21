@@ -20,6 +20,7 @@ pub mod decision;
 pub mod approval;
 pub mod compiled;
 pub mod check;
+pub mod key_derivation;
 pub mod registry;
 pub mod clock;
 pub mod durability;
@@ -46,6 +47,7 @@ pub use clock::{
     MockClockAnchorPoller, R3_MAX_ANCHOR_AGE_NS,
 };
 pub use compiled::{BitMap, CompileError, CompiledAuthority};
+pub use key_derivation::derive_receipt_stream_key;
 pub use registry::{
     MockRegistryFetcher, RegistryError, RegistryFetcher, SyncError, ToolEntry, ToolRegistry,
 };

@@ -513,6 +513,21 @@ impl PassportBuilder {
         self
     }
 
+    pub fn with_delegation_chain_hash(mut self, h: [u8; 32]) -> Self {
+        self.delegation_chain_hash = format!("sha256:{}", hex_encode(&h));
+        self
+    }
+
+    pub fn with_receipt_stream_id(mut self, id: &str) -> Self {
+        self.receipt_stream_id = id.into();
+        self
+    }
+
+    pub fn with_revocation_epoch(mut self, e: u32) -> Self {
+        self.revocation_epoch = e;
+        self
+    }
+
     /// Build the unsigned JSON, canonicalize via JCS, sign with the
     /// supplied key, reinsert the signature in `"ed25519:<hex>"` form,
     /// and return the final JSON. Simulates the gateway-side flow.

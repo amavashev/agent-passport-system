@@ -24,10 +24,10 @@ use napi::bindgen_prelude::{BigInt, External};
 use napi_derive::napi;
 
 use aps_verifier_core::{
-    aps_check, ActionDescriptor, CompiledAuthority, DecisionType, GroupCommitConfig,
-    ModeAReceiptSink, ModeB1ReceiptSink, ModeB2ReceiptSink, NullSink, ReasonCode, ReceiptSink,
-    RecoveryReport as CoreRecoveryReport, RecoveryStatus, RuntimePassport, SystemClock, Tier,
-    ToolEntry, ToolRegistry, TruncationReason, VerifierContext,
+    aps_check, derive_receipt_stream_key, ActionDescriptor, CompiledAuthority, DecisionType,
+    GroupCommitConfig, ModeAReceiptSink, ModeB1ReceiptSink, ModeB2ReceiptSink, NullSink,
+    ReasonCode, ReceiptSink, RecoveryReport as CoreRecoveryReport, RecoveryStatus, RuntimePassport,
+    SystemClock, Tier, ToolEntry, ToolRegistry, TruncationReason, VerifierContext,
 };
 
 // -----------------------------------------------------------------------
@@ -301,10 +301,10 @@ pub fn load_passport_unverified(
 
 /// Load a passport with crash recovery. Walks the existing log at
 /// `log_path`, validates the rolling MAC chain, recovers the
-/// sequence floor, and builds the AuthorityHandle. The chunk-4
-/// implementation hardcodes the rolling-MAC key to `[0u8; 32]`
-/// matching the chunk-2 placeholder `receipt_stream_key`; production
-/// recovery needs a real derived key (Phase 2).
+/// sequence floor, and builds the AuthorityHandle. The rolling-MAC
+/// key is derived from passport-bound inputs via
+/// [`aps_verifier_core::derive_receipt_stream_key`]; see the
+/// HKDF-DERIVATION-DESIGN memo for the construction.
 ///
 /// On success, the [`RecoveryReport`] is stored on the handle and
 /// retrievable via [`recovery_report`]. On failure (initial MAC
@@ -331,7 +331,7 @@ pub fn load_passport_with_recovery(
             .map_err(|e| reason_err("PassportParseFailed", e.to_string()))?,
     };
     let registry = build_registry(tools.clone())?;
-    let mac_key = [0u8; 32];
+    let mac_key = derive_mac_key_from_passport(&passport)?;
     let (authority, report) = CompiledAuthority::from_passport_with_recovery(
         &passport,
         &registry,
@@ -856,6 +856,40 @@ fn reason_code_name(r: ReasonCode) -> &'static str {
         ReasonCode::SequenceRecoveryInvalid => "SEQUENCE_RECOVERY_INVALID",
         ReasonCode::StrictModeRequired => "STRICT_MODE_REQUIRED",
     }
+}
+
+/// Compute the rolling-MAC receipt stream key for `passport` using
+/// the core's [`derive_receipt_stream_key`]. The signature and
+/// delegation-chain-hash fields are parsed from their string form
+/// (accepting either `"<prefix>:<hex>"` or bare hex), and the
+/// verifier-instance-id hash is computed via BLAKE3 the same way the
+/// core does.
+fn derive_mac_key_from_passport(passport: &RuntimePassport) -> napi::Result<[u8; 32]> {
+    let signature_bytes: [u8; 64] = hex_to_array_from_prefixed(&passport.signature)
+        .map_err(|e| reason_err("PassportSignatureDecodeFailed", &e))?;
+    let delegation_chain_hash: [u8; 32] = hex_to_array_from_prefixed(&passport.delegation_chain_hash)
+        .map_err(|e| reason_err("PassportDelegationChainHashDecodeFailed", &e))?;
+    let verifier_instance_id_hash =
+        *blake3::hash(passport.verifier_instance_id.as_bytes()).as_bytes();
+    Ok(derive_receipt_stream_key(
+        &signature_bytes,
+        &verifier_instance_id_hash,
+        &delegation_chain_hash,
+        &passport.receipt_stream_id,
+        passport.revocation_epoch,
+    ))
+}
+
+/// Strip an optional `"<prefix>:"` from `s` (matching how
+/// `aps-verifier-core` accepts `"ed25519:<hex>"` and
+/// `"blake3:<hex>"` shapes on the wire), then decode the remaining
+/// hex into a fixed-size byte array.
+fn hex_to_array_from_prefixed<const N: usize>(s: &str) -> Result<[u8; N], String> {
+    let hex = match s.split_once(':') {
+        Some((_, rest)) => rest,
+        None => s,
+    };
+    hex_to_array::<N>(hex)
 }
 
 fn hex_to_array<const N: usize>(hex: &str) -> Result<[u8; N], String> {

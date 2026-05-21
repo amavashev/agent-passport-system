@@ -2,6 +2,24 @@
 
 ## 2.3.0-alpha (unreleased)
 
+### Prototype 1 Phase 2 (verifier crate)
+
+- **HKDF-SHA256 derivation of `receipt_stream_key`.** The chunk-2
+  placeholder `[0u8; 32]` MAC key in both
+  `crates/aps-verifier-core/src/compiled.rs::from_passport` and
+  `packages/aps-sdk-runtime/src/lib.rs::load_passport_with_recovery`
+  is replaced with a real per-stream derivation. New module
+  `aps_verifier_core::key_derivation` exposes
+  `derive_receipt_stream_key(signature_bytes, verifier_instance_id_hash,
+  delegation_chain_hash, receipt_stream_id, revocation_epoch) -> [u8; 32]`,
+  computed via HKDF-SHA256 (Extract+Expand) with TLV-framed info. New
+  RustCrypto dependencies: `hkdf 0.12` and `sha2 0.10`. Zero wire-format
+  change. Phase 2 item 1 of 3; items 2 (build-time enforcement of
+  `load_passport_verified`) and 3 (approval-proof signature
+  verification) are separate handoffs.
+
+### TypeScript SDK (existing 2.3.0-alpha content)
+
 Reference implementation of
 [docs/ENFORCEMENT-TRUST-ANCHOR.md](./docs/ENFORCEMENT-TRUST-ANCHOR.md)
 Component A (bilateral receipts for dumb Web2 sinks). All additions are
