@@ -4,7 +4,7 @@
 
 ### Fixed
 - **`computeActionRef` is now strict RFC 8785 JCS** per
-  `draft-pidlisnyi-aps-00` §4.1. The action_ref pre-image is now hashed
+  `draft-pidlisnyi-aps-01` §4.1. The action_ref pre-image is now hashed
   via `canonicalHashJCS()` (new export from `src/core/canonical-jcs.ts`)
   instead of the legacy null-stripping `canonicalHash()`. Behaviour is
   byte-identical to the prior release for every input whose four-field
