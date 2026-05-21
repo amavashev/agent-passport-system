@@ -19,7 +19,7 @@ In each case a valid signature was insufficient to deny the action. Authority ad
 
 ## Wave 1 accountability primitives
 
-Ed25519 ActionReceipt, AuthorityBoundaryReceipt, CustodyReceipt, ContestabilityReceipt, APSBundle. RFC 8785 JCS canonicalized, content-addressed, byte-match across implementations.
+Ed25519 ActionReceipt, AuthorityBoundaryReceipt, CustodyReceipt, ContestabilityReceipt, APSBundle. RFC 8785 JCS canonicalization for cross-implementation receipts and conformance fixtures, content-addressed, byte-match across implementations.
 
 ## Install
 
