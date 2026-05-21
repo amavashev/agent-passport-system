@@ -12,11 +12,23 @@
   contains no null/undefined values — i.e. every production input.
   Inputs that did carry a null pre-image field previously produced
   hashes that diverged from any strict-JCS verifier in the ecosystem
-  (x402, AgentGraph CTEF, Nobulex); they now byte-match. Full test
-  suite passes unchanged (2965/2965, +1 new conformance test).
-  Internal call sites (`policy.ts`, `execution-envelope.ts`) inherit
-  the fix transitively. `computeAttributionActionRef` uses a separate
-  spec (ATTRIBUTION-PRIMITIVE-v1.1) and is unchanged in this release.
+  (x402, AgentGraph CTEF, Nobulex); they now byte-match. Internal call
+  sites (`policy.ts`, `execution-envelope.ts`) inherit the fix
+  transitively.
+- **`computeAttributionActionRef` is now strict RFC 8785 JCS** per
+  `ATTRIBUTION-PRIMITIVE-v1.1` §1.6. The four-tuple `{agentId, actionType,
+  params, nonce}` is now hashed via `canonicalHashJCS()` from
+  `src/core/canonical-jcs.ts` instead of the local null-stripping
+  `canonicalHashHex()`. This restores Theorem 1's Assumption A1
+  (canonicalization injectivity over schema-valid action tuples) for the
+  attribution receipt's security reduction: a `params` object containing
+  `{k:null, v:1}` no longer collides with `{v:1}` under the canonical
+  bytes. `hashAxisLeaf` and `envelopeBytes` in
+  `src/v2/attribution-primitive/canonical.ts` continue to use the local
+  canonicalizer in this release; a follow-up will reconcile them once
+  cross-impl byte-parity for the Merkle leaves is rerun.
+- Full test suite passes unchanged: **2966/2966, 0 failures** (was 2964
+  pre-fix; +2 new conformance tests, one per fixed primitive).
 
 ## 2.3.0-alpha (unreleased)
 

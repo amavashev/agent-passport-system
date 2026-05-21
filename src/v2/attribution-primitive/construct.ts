@@ -11,9 +11,9 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { sign } from '../../crypto/keys.js'
+import { canonicalHashJCS } from '../../core/canonical-jcs.js'
 import {
   assertCanonicalTimestamp,
-  canonicalHashHex,
   canonicalTimestamp,
   envelopeBytes,
 } from './canonical.js'
@@ -31,7 +31,14 @@ import type {
  *  canonical(T) being injective (A1). Plain string concatenation is not
  *  self-delimiting, so two distinct tuples could produce the same byte
  *  string. We adopt canonical(T) on the full tuple, which is injective by
- *  construction and matches the security argument. */
+ *  construction and matches the security argument.
+ *
+ *  Canonicalization uses strict RFC 8785 JCS (canonicalHashJCS), not the
+ *  legacy null-stripping APS variant. ATTRIBUTION-PRIMITIVE-v1.1 §1.6
+ *  pins all hashing to RFC 8785, and Theorem 1's Assumption A1
+ *  (canonicalization injectivity) requires that semantically distinct
+ *  action tuples produce distinct canonical bytes — which null-stripping
+ *  would violate ({k:null, v:1} and {v:1} would collide). */
 export function computeAttributionActionRef(action: AttributionAction): string {
   if (!action.agentId) throw new Error('attribution-primitive: action.agentId required')
   if (!action.actionType) throw new Error('attribution-primitive: action.actionType required')
@@ -39,7 +46,7 @@ export function computeAttributionActionRef(action: AttributionAction): string {
   if (typeof action.params !== 'object' || action.params === null) {
     throw new Error('attribution-primitive: action.params must be an object')
   }
-  return canonicalHashHex({
+  return canonicalHashJCS({
     agentId: action.agentId,
     actionType: action.actionType,
     params: action.params,

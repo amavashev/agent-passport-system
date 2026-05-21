@@ -233,6 +233,23 @@ describe('computeAttributionActionRef', () => {
     assert.throws(() => computeAttributionActionRef({ agentId: 'a', actionType: '', params: {}, nonce: 'n' } as AttributionAction))
     assert.throws(() => computeAttributionActionRef({ agentId: 'a', actionType: 't', params: {}, nonce: '' } as AttributionAction))
   })
+
+  it('preserves null-valued keys in params per RFC 8785 (ATTRIBUTION-PRIMITIVE-v1.1 §1.6)', () => {
+    // Strict-JCS conformance pin. §1.6 pins all hashing to RFC 8785;
+    // Theorem 1's Assumption A1 (canonicalization injectivity) requires
+    // that {k:null, v:1} and {v:1} canonicalize to distinct byte strings.
+    // Null-stripping would violate A1 and weaken the security reduction.
+    // Expected hash independently reproduced by canonicalize@3.0.0
+    // (erdtman, RFC 8785 author) and rfc8785@0.1.4 (PyPI).
+    const action: AttributionAction = {
+      agentId: 'a',
+      actionType: 't',
+      params: { k: null as unknown as string, v: 1 },
+      nonce: 'n0',
+    }
+    const expected = 'c0686ef2cbb2b1c38b149598c50a60b0c01c2fd0ef9fd35f81eabb1aced6d591'
+    assert.equal(computeAttributionActionRef(action), expected)
+  })
 })
 
 // ─────────────────────────────────────────────────────────────
