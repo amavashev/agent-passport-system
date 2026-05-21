@@ -1,0 +1,256 @@
+// Copyright 2024-2026 Tymofii Pidlisnyi. Apache-2.0 license. See LICENSE.
+// ══════════════════════════════════════════════════════════════════
+// Cycles — reserve/commit/release budget-authority rail
+// ══════════════════════════════════════════════════════════════════
+// Cycles (https://runcycles.io) is a pre-execution budget and action-
+// authority protocol with a four-event lifecycle on the runtime plane:
+//
+//   decide  → stateless pre-check        (POST /v1/decide)
+//   reserve → atomic authorization       (POST /v1/reservations)
+//   commit  → settle at actual           (POST /v1/reservations/{id}/commit)
+//   release → clear without debit        (POST /v1/reservations/{id}/release)
+//
+// Plus error responses (4xx/5xx) on any of the above.
+//
+// This adapter binds APS V2 governance to Cycles at the
+// reserve / commit / release boundary, with the two-receipt emission
+// model agreed in aeoess/agent-passport-system#25:
+//
+//   - Permit-receipt at reserve     (rail.budget_reservation.permit.v1)
+//   - Release-receipt at release    (rail.budget_reservation.release.v1)
+//   - Denial-receipt on live 4xx    (rail.budget_reservation.denial.v1)
+//   - Denial-receipt on dry-run DENY or /v1/decide DENY (same literal)
+//
+// Signed denials carry an APS Tier-1 `denial_reason` (closed enum) plus
+// the richer Cycles-specific detail Tier-2 in `cycles.denial_detail`.
+// The full mapping spec lives at runcycles/cycles-protocol drafts/
+// cycles-aps-denial-mapping-v0.1.md (merged commit 9b0fb5e).
+//
+// CyclesEvidence — the signed, content-addressed envelope wrapping the
+// canonical Cycles wire body — is specified at runcycles/cycles-protocol
+// drafts/cycles-evidence-v0.1.yaml (merged commit 61186a2). APS receipts
+// reference it via the minimal `CyclesEvidenceRef` join shape below.
+//
+// SDK scope: type model + denial mapping + signed two-receipt emission.
+// Out of scope (gateway product): live HTTP intercept, CyclesEvidence
+// envelope construction (the Cycles server emits those), reservation
+// lifecycle orchestration, multi-tenant routing.
+// ══════════════════════════════════════════════════════════════════
+
+import type { ScopeOfClaim } from '../../accountability/types/base.js'
+export type { ScopeOfClaim } from '../../accountability/types/base.js'
+
+/** Cycles protocol pin. Bump when the upstream protocol revision changes. */
+export const CYCLES_PROTOCOL_VERSION = 'cycles-protocol-v0.1.25' as const
+
+/** CyclesEvidence schema version this adapter consumes. */
+export const CYCLES_EVIDENCE_SCHEMA_VERSION = 'cycles-evidence/v0.1' as const
+
+// ── APS claim_type literals (rail.budget_reservation.*) ───────────
+// These match the literals added to the payment-rails verifier in
+// aeoess/agent-passport-system#27 (merged commit 4abd9df). The
+// receipt-side literals (permit, release) ride the receipt-verify
+// path; the denial literal rides the denial-verify path.
+
+export const RAIL_BUDGET_RESERVATION_PERMIT_CLAIM_TYPE =
+  'rail.budget_reservation.permit.v1' as const
+export const RAIL_BUDGET_RESERVATION_RELEASE_CLAIM_TYPE =
+  'rail.budget_reservation.release.v1' as const
+export const RAIL_BUDGET_RESERVATION_DENIAL_CLAIM_TYPE =
+  'rail.budget_reservation.denial.v1' as const
+
+// ── CyclesEvidenceRef (minimal join shape, APS ↔ Cycles boundary) ─
+// Per issue #25 comment 4422627045: APS receipts reference Cycles-side
+// CyclesEvidence envelopes by URL + content hash. The full
+// envelope schema lives in cycles-protocol; APS only carries the join.
+
+export interface CyclesEvidenceRef {
+  /** Where to fetch the signed CyclesEvidence envelope. Opaque to APS. */
+  cycles_evidence_url: string
+  /** sha256 hex of the JCS-canonical envelope bytes with both
+   *  evidence_id and signature emptied. The content-addressed id of
+   *  the Cycles-side artifact this receipt binds to. */
+  cycles_evidence_id_sha256: string
+  /** APS-side action anchor (mirrors PaymentReceipt.action_ref). */
+  action_ref: string
+  /** APS-side delegation anchor (mirrors PaymentReceipt.delegation_ref). */
+  delegation_ref: string
+  /** For commit/release receipts: the prior permit-receipt's id, so
+   *  the authorization → settlement chain is reconstructable from
+   *  evidence alone. Omitted on permit-receipts and standalone denials. */
+  prior_permit_receipt_id?: string
+}
+
+// ── Cycles wire-shape mirrors (minimal, read-only) ────────────────
+// The adapter consumes CyclesEvidence envelopes to extract the
+// denial signal. Defined here as a structural subset; full canonical
+// schema lives at runcycles/cycles-protocol drafts/cycles-evidence-v0.1.yaml.
+
+/** Cycles `Decision` enum — three-way decision on /decide and reserve. */
+export type CyclesDecision = 'ALLOW' | 'ALLOW_WITH_CAPS' | 'DENY'
+
+/** Cycles `ArtifactType` — the five CyclesEvidence lifecycle events. */
+export type CyclesArtifactType =
+  | 'decide'
+  | 'reserve'
+  | 'commit'
+  | 'release'
+  | 'error'
+
+/** Minimal read-only view of a CyclesEvidence envelope's payload
+ *  variants — only the fields the adapter actually reads. The full
+ *  envelope schema (signed, content-addressed) lives at the canonical
+ *  spec; this mirror exists so the denial-mapper can pattern-match
+ *  without a full schema-validation dependency. */
+export interface CyclesEvidenceView {
+  artifact_type: CyclesArtifactType
+  trace_id?: string
+  payload:
+    | {
+        decide: { response: { decision: CyclesDecision; reason_code?: string } }
+      }
+    | {
+        reserve: { response: { decision: CyclesDecision; reason_code?: string } }
+      }
+    | { commit: { reservation_id: string } }
+    | { release: { reservation_id: string } }
+    | {
+        error: {
+          endpoint: string
+          http_status: number
+          reservation_id?: string
+          response: {
+            error: string
+            message: string
+            request_id: string
+            trace_id?: string
+          }
+        }
+      }
+}
+
+// ── Cycles permit-receipt ─────────────────────────────────────────
+
+/** Signed receipt emitted at reserve-allow. Binds the APS delegation
+ *  to a Cycles reservation; references the CyclesEvidence envelope
+ *  for the underlying reserve event. */
+export interface CyclesPermitReceipt {
+  claim_type: typeof RAIL_BUDGET_RESERVATION_PERMIT_CLAIM_TYPE
+  receipt_id: string
+  signer: string
+  agent_id: string
+  delegation_ref: string
+  action_ref: string
+  rail_name: 'cycles'
+  /** Cycles reservation_id from the reserve response. */
+  reservation_id: string
+  /** Reserved amount in canonical (unit, amount) form. Unit is the
+   *  Cycles UnitEnum — USD_MICROCENTS, TOKENS, CREDITS, or RISK_POINTS. */
+  reserved: { unit: string; amount: number }
+  /** Cycles decision: ALLOW or ALLOW_WITH_CAPS (DENY rides denial). */
+  decision: 'ALLOW' | 'ALLOW_WITH_CAPS'
+  /** Reservation TTL deadline (Cycles `expires_at_ms`). */
+  expires_at_ms?: number
+  /** Bind to the signed Cycles-side artifact. */
+  cycles_evidence: CyclesEvidenceRef
+  issued_at: string
+  /** Hex Ed25519 signature over the canonical receipt body, signature cleared. */
+  signature: string
+
+  /** Phase 4.1 / Q1 accountability fields. */
+  timestamp?: string
+  scope_of_claim?: ScopeOfClaim
+}
+
+// ── Cycles release-receipt ────────────────────────────────────────
+
+/** Signed receipt emitted at release. Symmetric to permit; references
+ *  the prior permit-receipt for chain completeness. */
+export interface CyclesReleaseReceipt {
+  claim_type: typeof RAIL_BUDGET_RESERVATION_RELEASE_CLAIM_TYPE
+  receipt_id: string
+  signer: string
+  agent_id: string
+  delegation_ref: string
+  action_ref: string
+  rail_name: 'cycles'
+  reservation_id: string
+  released: { unit: string; amount: number }
+  /** Optional reason from the ReleaseRequest body. */
+  reason?: string
+  cycles_evidence: CyclesEvidenceRef
+  issued_at: string
+  signature: string
+
+  timestamp?: string
+  scope_of_claim?: ScopeOfClaim
+}
+
+// ── Cycles denial-receipt ─────────────────────────────────────────
+
+/** Closed taxonomy of Cycles-sourced denial reasons (the source axis;
+ *  the Tier-1 mapping happens via mapCyclesDenialToFoundation). */
+export type CyclesDenialSource = 'ErrorCode' | 'DecisionReasonCode'
+
+/** Cycles-specific denial detail. Lives Tier-2 in the APS denial-
+ *  receipt under `cycles.denial_detail` so audit consumers retain the
+ *  canonical denial identifier byte-for-byte. */
+export interface CyclesDenialDetail {
+  layer: 'cycles'
+  /** Which Cycles axis surfaced the denial — see mapping doc. */
+  source: CyclesDenialSource
+  /** The canonical Cycles code (ErrorCode value OR DecisionReasonCode
+   *  value, depending on `source`). Preserved byte-for-byte. */
+  code: string
+  /** HTTP status on the wire (only present when source=ErrorCode). */
+  http_status?: number
+  /** Server message (only present when source=ErrorCode). */
+  message?: string
+  /** Request correlation id (only present when source=ErrorCode). */
+  request_id?: string
+  /** W3C Trace Context trace-id (32-hex), when populated. */
+  trace_id?: string
+}
+
+/** Signed denial — emitted on live 4xx, on /v1/decide DENY, or on
+ *  dry-run reserve DENY. Carries the APS Tier-1 reason (closed enum
+ *  via DenialReason from payment-rails/types.ts) plus the rich
+ *  Cycles-side detail Tier-2. */
+export interface CyclesDenial {
+  claim_type: typeof RAIL_BUDGET_RESERVATION_DENIAL_CLAIM_TYPE
+  receipt_id: string
+  signer: string
+  agent_id: string
+  delegation_ref: string
+  action_ref: string
+  rail_name: 'cycles'
+  /** APS Tier-1 reason from payment-rails/types.ts DenialReason. The
+   *  string-typed import avoids a circular import; runtime validation
+   *  via VALID_DENIAL_REASONS in hooks.ts. */
+  denial_reason: string
+  cycles: { denial_detail: CyclesDenialDetail }
+  cycles_evidence: CyclesEvidenceRef
+  issued_at: string
+  signature: string
+
+  timestamp?: string
+  scope_of_claim?: ScopeOfClaim
+}
+
+// ── Verification result types ─────────────────────────────────────
+
+export type CyclesVerifyReason =
+  | 'INVALID_CLAIM_TYPE'
+  | 'INVALID_SCHEMA_VERSION'
+  | 'MISSING_REQUIRED_FIELD'
+  | 'SIGNATURE_INVALID'
+  | 'EVIDENCE_REF_HASH_MISMATCH'
+  | 'DID_RESOLVER_MISSING'
+  | 'DID_URI_INVALID'
+  | 'DID_DOC_NOT_FOUND'
+  | 'DID_KEY_NOT_IN_DOC'
+  | 'DID_KEY_RETIRED'
+
+export type CyclesVerifyResult =
+  | { valid: true }
+  | { valid: false; reason: CyclesVerifyReason; detail?: string }
