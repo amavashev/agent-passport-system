@@ -74,6 +74,45 @@ export interface OwnerConfirmation {
   signature: string
 }
 
+// ── Responsibility Anchor (matrix v2 candidate C-II-3) ──
+/**
+ * Identifies the human or organizational principal whose authority traces
+ * through one hop of a delegation chain.
+ *
+ * Required for matrix v2 candidate C-II-3 (recursive delegation accountability
+ * beyond two hops). Monotonic narrowing in v1 answers who authorizes what.
+ * It does not answer which human bears responsibility when several principals
+ * authorize chains that meet at hop three or later. ResponsibilityAnchor
+ * carries that answer on the hop itself, and cascadePrincipal in
+ * src/v2/delegation/responsibility.ts resolves chains that mix it.
+ *
+ * The field is additive on V2Delegation. Existing delegations without it
+ * remain valid. The cascade falls back to the chain root delegation when no
+ * anchors are present.
+ */
+export interface ResponsibilityAnchor {
+  /**
+   * Ed25519 public key (hex) of the principal recorded on this hop. When
+   * principal_kind is 'human' or 'org' this is the actual human or
+   * organization. When principal_kind is 'agent_acting_for_principal' this is
+   * the acting agent itself; the upstream human or org is resolved by walking
+   * acting_agent_id through the chain.
+   */
+  principal_id: string
+
+  /** What kind of entity principal_id refers to on this hop. */
+  principal_kind: 'human' | 'org' | 'agent_acting_for_principal'
+
+  /**
+   * Required when principal_kind is 'agent_acting_for_principal'. The
+   * identifier of the upstream entity this hop acts on behalf of. The cascade
+   * walks this through the chain until it lands on a 'human' or 'org' anchor.
+   * Must match another anchor's principal_id in the same chain for the
+   * cascade to resolve.
+   */
+  acting_agent_id?: string
+}
+
 // ── v2 Delegation ──
 export interface V2Delegation {
   id: string
@@ -90,6 +129,14 @@ export interface V2Delegation {
   expansion_reviewer: string | null
   expansion_review_sig: string | null
   assurance_class: AssuranceClass
+  /**
+   * Optional principal-of-record carrier for this hop. See ResponsibilityAnchor
+   * and cascadePrincipal in src/v2/delegation/responsibility.ts. Newly issued
+   * delegations from this SDK version forward should set it. Legacy
+   * delegations remain valid; the cascade walks back to the root delegation's
+   * delegator as fallback.
+   */
+  responsibility_anchor?: ResponsibilityAnchor
 }
 
 // ── Outcome Record ──
