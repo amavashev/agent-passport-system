@@ -1,5 +1,7 @@
 # Cognitive Attestation
 
+> **Note on related module:** there is a separate module at `src/v2/cognitive_attestation/` (snake-case) which implements the vocabulary-aligned `cognitive_attestation` signal_type per [PR #104](https://github.com/aeoess/agent-governance-vocabulary/pull/104). It is a different primitive: governance-track envelopes with three determinability classes (precondition_set, candidate_set, decision_path), single-signer, signature-only verification. This module is the paper-grade primitive for feature-level model computation per the Zenodo paper. The two do not collide on exports and do not import each other. Pick the one that matches your use case.
+
 TypeScript primitive for **signed declarations of feature-level model
 computation**. Part of APS v2.1.0.
 
