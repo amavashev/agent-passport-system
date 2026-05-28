@@ -33,6 +33,10 @@ export { computeScopeVersionHash, verifyScopeVersionMatch } from './core/scope-v
 
 // ── action_ref (A2A#1672) — Content-Addressed Request Identity ──
 export { computeActionRef, actionRefsMatch } from './core/action-ref.js'
+// External cross-ecosystem correlation key (action-ref-v1-jcs-sha256).
+// Distinct primitive from the APS-native action_ref above.
+export { computeExternalActionRefV1 } from './core/external-action-ref.js'
+export type { ExternalActionRefV1Input } from './core/external-action-ref.js'
 export { computeIdempotencyKey } from './core/idempotency.js'
 
 // ── Attestation Freshness (A2A#1712) ──

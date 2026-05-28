@@ -50,6 +50,9 @@ export { rotateKey } from './core/identity.js'
 
 // Content-Addressed Identity
 export { computeActionRef } from './core/action-ref.js'
+// External cross-ecosystem correlation key, distinct from the native action_ref.
+export { computeExternalActionRefV1 } from './core/external-action-ref.js'
+export type { ExternalActionRefV1Input } from './core/external-action-ref.js'
 export { computeIdempotencyKey } from './core/idempotency.js'
 
 // Compliance: generateComplianceReport moved to @aeoess/gateway. See MIGRATION.md.

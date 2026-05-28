@@ -2,6 +2,21 @@
 
 ## 2.6.0-alpha.4 (unreleased)
 
+### Added
+- **`computeExternalActionRefV1`** (`src/core/external-action-ref.ts`): a
+  separate helper for the external cross-ecosystem correlation key
+  (`action-ref-v1-jcs-sha256`, as computed by argentum-core, x402 #2332,
+  Gonka, and the joint I-D on A2A #1850). It is `SHA-256(JCS({action_type,
+  agent_id, scope, timestamp}))` with snake_case keys, `scope` as a single
+  string, and a millisecond RFC 3339 timestamp hashed as opaque bytes (a
+  non-canonical timestamp is rejected, not coerced, matching the aps-broker
+  verifier). This is a distinct primitive from the APS-native `action_ref`
+  (`computeActionRef`, draft-pidlisnyi-aps-01 §4.1): different preimage,
+  different key casing, and a single scope string rather than the native
+  multi-scope array. `computeActionRef` is unchanged. Byte-matched against
+  three published anchors in `tests/external-action-ref.test.ts` (584bc79b,
+  fdd7f810, d7a591f6). Additive only; no breaking change.
+
 ### Fixed
 - **`computeActionRef` is now strict RFC 8785 JCS** per
   `draft-pidlisnyi-aps-01` §4.1. The action_ref pre-image is now hashed
