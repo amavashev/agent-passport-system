@@ -42,6 +42,14 @@ export function sign(message: string, privateKeyHex: string): string {
 }
 
 export function verify(message: string, signatureHex: string, publicKeyHex: string): boolean {
+  // Ed25519 public keys are exactly 32 bytes (64 hex chars) and signatures are
+  // exactly 64 bytes (128 hex chars). Reject any other length up front. This
+  // closes a key-equivocation gap (a longer public key whose leading 32 bytes
+  // are valid must NOT verify, because the fixed DER prefix declares a 32-byte
+  // key and trailing bytes would otherwise be ignored), enforces signature
+  // length, and bounds work on attacker-supplied input before any hex parsing.
+  if (typeof publicKeyHex !== 'string' || publicKeyHex.length !== 64) return false
+  if (typeof signatureHex !== 'string' || signatureHex.length !== 128) return false
   try {
     const pubBytes = hexToBytes(publicKeyHex)
     const derPrefix = Buffer.from('302a300506032b6570032100', 'hex')
