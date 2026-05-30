@@ -302,6 +302,33 @@ describe('AV-3: Governance Block Expiry', () => {
     // Different signatures because expires_at is in the signed payload
     assert.notEqual(block1.signature, block2.signature)
   })
+
+  it('verifyGovernanceBlock rejects an expired block (qntm#7)', () => {
+    const past = new Date(Date.now() - 86400000).toISOString()
+    const block = generateGovernanceBlock({
+      content: ARTICLE, publicKey: keys.publicKey, privateKey: keys.privateKey,
+      terms: { inference: 'permitted' },
+      expiresAt: past,
+    })
+    const result = verifyGovernanceBlock(block, ARTICLE, keys.publicKey)
+    // Signature/content/DID are all sound; only expiry fails.
+    assert.equal(result.signatureValid, true)
+    assert.equal(result.expired, true)
+    assert.equal(result.valid, false)
+    assert.ok(result.errors.some(e => e.toLowerCase().includes('expired')))
+  })
+
+  it('verifyGovernanceBlock accepts a non-expired block and reports expired=false', () => {
+    const future = new Date(Date.now() + 86400000).toISOString()
+    const block = generateGovernanceBlock({
+      content: ARTICLE, publicKey: keys.publicKey, privateKey: keys.privateKey,
+      terms: { inference: 'permitted' },
+      expiresAt: future,
+    })
+    const result = verifyGovernanceBlock(block, ARTICLE, keys.publicKey)
+    assert.equal(result.expired, false)
+    assert.equal(result.valid, true)
+  })
 })
 
 // ══════════════════════════════════════════════════════════════════

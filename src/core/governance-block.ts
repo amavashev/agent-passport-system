@@ -152,6 +152,8 @@ export interface GovernanceBlockVerification {
   contentHashValid: boolean
   /** Does the DID resolve to the signing key? */
   didConsistent: boolean
+  /** Is the block past its expires_at? False when no expiry is set. */
+  expired: boolean
   /** Overall: all checks pass */
   valid: boolean
   /** Human-readable errors */
@@ -198,11 +200,19 @@ export function verifyGovernanceBlock(
     }
   }
 
+  // 5. Expiry: an expired block must not verify as valid. Previously expiry
+  // was carried in the signed payload but never enforced here, so an expired
+  // block still returned valid (MoltyCel, qntm#7). expires_at is already part
+  // of the signed bytes, so this adds enforcement without any wire change.
+  const expired = isGovernanceBlockExpired(block)
+  if (expired) errors.push('Governance block has expired')
+
   return {
     signatureValid,
     contentHashValid,
     didConsistent,
-    valid: signatureValid && contentHashValid && didConsistent && skillHashValid,
+    expired,
+    valid: signatureValid && contentHashValid && didConsistent && skillHashValid && !expired,
     errors,
   }
 }
