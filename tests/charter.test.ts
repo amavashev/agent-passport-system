@@ -395,6 +395,64 @@ describe('Charter — Amendments', () => {
     assert.ok(result.valid, `Expected valid amendment: ${result.errors.join(', ')}`)
   })
 
+  it('rejects a signature replayed onto a swapped proposedCharter (re-audit)', () => {
+    const founder = generateKeyPair()
+    const charter = createCharter({
+      name: 'Replay Test',
+      offices: [makeOffice('ops', 'Ops', founder.publicKey)],
+      amendmentPolicy: makeThresholdPolicy([founder.publicKey], 1),
+      dissolutionPolicy: makeDissolutionPolicy([founder.publicKey]),
+      delegationSurvival: SURVIVAL,
+      founderPrivateKey: founder.privateKey,
+      founderPublicKey: founder.publicKey,
+      founderRole: 'board',
+    })
+
+    const benign = createCharter({
+      name: 'Replay Test v2 benign',
+      offices: [makeOffice('ops', 'Ops', founder.publicKey)],
+      amendmentPolicy: makeThresholdPolicy([founder.publicKey], 1),
+      dissolutionPolicy: makeDissolutionPolicy([founder.publicKey]),
+      delegationSurvival: SURVIVAL,
+      founderPrivateKey: founder.privateKey,
+      founderPublicKey: founder.publicKey,
+      founderRole: 'board',
+      version: '2.0.0',
+    })
+
+    // A malicious charter at the same version, so the version check still
+    // passes and only the signature binding can stop the swap.
+    const attacker = generateKeyPair()
+    const malicious = createCharter({
+      name: 'Replay Test v2 malicious',
+      offices: [makeOffice('ops', 'Ops', attacker.publicKey)],
+      amendmentPolicy: makeThresholdPolicy([attacker.publicKey], 1),
+      dissolutionPolicy: makeDissolutionPolicy([attacker.publicKey]),
+      delegationSurvival: SURVIVAL,
+      founderPrivateKey: attacker.privateKey,
+      founderPublicKey: attacker.publicKey,
+      founderRole: 'board',
+      version: '2.0.0',
+    })
+
+    const amendment = createAmendment({
+      charter,
+      proposedCharter: benign,
+      description: 'Routine update',
+      proposerPrivateKey: founder.privateKey,
+      proposerPublicKey: founder.publicKey,
+    })
+
+    // The legitimate amendment verifies.
+    assert.ok(verifyAmendment(amendment, charter).signaturesValid)
+
+    // Attack: keep the collected signature, swap in the malicious charter.
+    const swapped = { ...amendment, proposedCharter: malicious }
+    const bad = verifyAmendment(swapped, charter)
+    assert.equal(bad.signaturesValid, false)
+    assert.equal(bad.valid, false)
+  })
+
   it('rejects amendment against dissolved charter', () => {
     const founder = generateKeyPair()
     const charter = createCharter({

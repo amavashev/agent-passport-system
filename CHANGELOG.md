@@ -2,6 +2,18 @@
 
 ## 2.6.0-alpha.4 (unreleased)
 
+### Security
+- **Charter amendment signatures now bind the proposed charter (breaking to
+  prior amendment signatures).** `createAmendment`, `signAmendment`, and
+  `verifyAmendment` previously signed and verified only
+  `charterId + ':' + description`, so a collected signature could be replayed
+  onto a different `proposedCharter` with the same id and description. All
+  three now sign and verify a canonical content that includes the version
+  transition and the full `proposedCharter`. This changes the signed bytes,
+  so amendment signatures produced by an earlier build no longer verify and
+  must be re-collected. No other primitive is affected. Swap-replay
+  regression test added.
+
 ### Added
 - **`computeExternalActionRefV1`** (`src/core/external-action-ref.ts`): a
   separate helper for the external cross-ecosystem correlation key

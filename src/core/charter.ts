@@ -305,6 +305,28 @@ export interface CreateAmendmentOptions {
   effectiveAt?: string          // defaults to now
 }
 
+/** Canonical bytes that every amendment signer signs and the verifier checks.
+ *  Binds the version transition and the full proposedCharter into the
+ *  signature, so a signature collected for one amendment cannot be replayed
+ *  onto a different proposedCharter with the same charterId and description
+ *  (qntm#7 / re-audit finding). The mutable signatures/status fields are
+ *  excluded so every co-signer signs identical bytes. */
+function amendmentSignContent(a: {
+  charterId: string
+  fromVersion: string
+  toVersion: string
+  description: string
+  proposedCharter: CharterCore
+}): string {
+  return canonicalize({
+    charterId: a.charterId,
+    fromVersion: a.fromVersion,
+    toVersion: a.toVersion,
+    description: a.description,
+    proposedCharter: a.proposedCharter,
+  })
+}
+
 /** Create a charter amendment proposal. Does NOT apply it —
  *  signatures must be collected and threshold evaluated first. */
 export function createAmendment(opts: CreateAmendmentOptions): CharterAmendment {
@@ -323,7 +345,13 @@ export function createAmendment(opts: CreateAmendmentOptions): CharterAmendment 
     publicKey: opts.proposerPublicKey,
     role: 'proposer',
     signedAt: now,
-    signature: sign(opts.charter.charterId + ':' + opts.description, opts.proposerPrivateKey),
+    signature: sign(amendmentSignContent({
+      charterId: opts.charter.charterId,
+      fromVersion: opts.charter.version,
+      toVersion: opts.proposedCharter.version,
+      description: opts.description,
+      proposedCharter: opts.proposedCharter,
+    }), opts.proposerPrivateKey),
   }
 
   return {
@@ -356,7 +384,7 @@ export function signAmendment(
     publicKey: signerPublicKey,
     role: signerRole,
     signedAt: new Date().toISOString(),
-    signature: sign(amendment.charterId + ':' + amendment.description, signerPrivateKey),
+    signature: sign(amendmentSignContent(amendment), signerPrivateKey),
   }
 
   return { ...amendment, signatures: [...amendment.signatures, sig] }
@@ -381,9 +409,11 @@ export function verifyAmendment(
   const versionMatch = charter.version === amendment.fromVersion
   if (!versionMatch) errors.push(`Version mismatch: charter is ${charter.version}, amendment targets ${amendment.fromVersion}`)
 
-  // 3. Verify individual signatures
+  // 3. Verify individual signatures over the full amendment content,
+  // including the proposedCharter, so a signature cannot be replayed onto a
+  // different proposed charter.
   let signaturesValid = true
-  const sigContent = amendment.charterId + ':' + amendment.description
+  const sigContent = amendmentSignContent(amendment)
   for (const sig of amendment.signatures) {
     try {
       if (!verify(sigContent, sig.signature, sig.publicKey)) {
