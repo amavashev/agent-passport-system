@@ -129,6 +129,26 @@ export interface CyclesEvidenceView {
       }
 }
 
+// ── Authority-state-at-admission snapshot ─────────────────────────
+// Optional Track B field (aeoess/agent-passport-system#25, amavashev
+// catch): a snapshot of the authority/revocation/expiry state APS
+// evaluated at admission, BEFORE calling Cycles. Carried inline on the
+// permit-receipt (see `authority_state_at_admission` below), not as a
+// content-hash ref. The delegation identity is not duplicated here — the
+// receipt's own `delegation_ref` names the delegation this state is for.
+
+/** Snapshot of the delegation-authority state APS saw at admission. */
+export interface AuthorityStateSnapshot {
+  /** Admission-time ISO 8601 — when APS evaluated this authority state. */
+  checked_at: string
+  /** Revocation state APS saw at admission. */
+  delegation_revoked: boolean
+  /** Delegation expiry APS saw at admission, when known. */
+  delegation_expires_at?: string
+  /** Origin of the snapshot. Fixed for the APS admission path. */
+  source: 'aps_admission'
+}
+
 // ── Cycles permit-receipt ─────────────────────────────────────────
 
 /** Signed receipt emitted at reserve-allow. Binds the APS delegation
@@ -160,6 +180,12 @@ export interface CyclesPermitReceipt {
   /** Phase 4.1 / Q1 accountability fields. */
   timestamp?: string
   scope_of_claim?: ScopeOfClaim
+
+  /** Optional (Track B): the authority/revocation/expiry state APS
+   *  evaluated at admission, before calling Cycles, carried inline.
+   *  Optional so existing fixtures and call sites that omit it stay
+   *  valid. */
+  authority_state_at_admission?: AuthorityStateSnapshot
 }
 
 // ── Cycles release-receipt ────────────────────────────────────────
@@ -268,6 +294,11 @@ export interface SignCyclesPermitReceiptInput {
   decision: 'ALLOW' | 'ALLOW_WITH_CAPS'
   expires_at_ms?: number
   cycles_evidence: CyclesEvidenceRef
+  /** Optional (Track B): the authority-state snapshot APS evaluated at
+   *  admission. When supplied, it is carried inline on the permit-receipt
+   *  as authority_state_at_admission; when omitted, the field is left
+   *  absent. */
+  authority_state_at_admission?: AuthorityStateSnapshot
   /** Override the rail's default scope_of_claim. */
   scope_of_claim?: ScopeOfClaim
   /** When supplied alongside `issuer_key_ref`, signer becomes a DID URI

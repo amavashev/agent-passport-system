@@ -18,9 +18,22 @@ import {
   verifyCyclesReleaseReceipt,
 } from '../../../src/v2/payment-rails/cycles/index.js'
 import type {
+  AuthorityStateSnapshot,
   CyclesEvidenceRef,
   CyclesEvidenceView,
 } from '../../../src/v2/payment-rails/cycles/types.js'
+
+// ── Authority-state-at-admission fixture (Track B, aps#25) ────────
+// The authority/revocation/expiry state APS saw at admission, carried
+// inline on the permit-receipt (delegation identity is not duplicated —
+// the receipt's own delegation_ref names it).
+
+const ADMISSION_SNAPSHOT_FIXTURE: AuthorityStateSnapshot = {
+  checked_at: '2026-05-30T12:00:00.000Z',
+  delegation_revoked: false,
+  delegation_expires_at: '2026-06-30T00:00:00.000Z',
+  source: 'aps_admission',
+}
 
 // ── Test helpers ──────────────────────────────────────────────────
 
@@ -442,4 +455,76 @@ test('verifyCyclesPermitReceipt (sync): DID URI signer → DID_RESOLVER_MISSING'
   const result = verifyCyclesPermitReceipt(receipt)
   assert.equal(result.valid, false)
   if (!result.valid) assert.equal(result.reason, 'DID_RESOLVER_MISSING')
+})
+
+// ── Authority-state-at-admission (Track B, aps#25, staged, inline) ─
+
+test('signCyclesPermitReceipt: WITH authority_state_at_admission → carries the inline object and verifies', () => {
+  const { privateKey } = generateKeyPair()
+  const receipt = signCyclesPermitReceipt(
+    {
+      agent_id: 'agent-cycles-001',
+      delegation_ref: 'aps:delegation:cycles-admission-001',
+      action_ref: 'aps:action:cycles-admission-001',
+      reservation_id: 'rsv_admission_001',
+      reserved: { unit: 'USD_MICROCENTS', amount: 1500000 },
+      decision: 'ALLOW',
+      cycles_evidence: evidenceRef(),
+      authority_state_at_admission: ADMISSION_SNAPSHOT_FIXTURE,
+    },
+    privateKey,
+  )
+  // (a) the inline snapshot is carried verbatim on the receipt...
+  assert.deepEqual(receipt.authority_state_at_admission, ADMISSION_SNAPSHOT_FIXTURE)
+  // ...and the receipt (with the object inside the signed body) verifies.
+  assert.deepEqual(verifyCyclesPermitReceipt(receipt), { valid: true })
+})
+
+test('signCyclesPermitReceipt: tampering a field inside authority_state_at_admission → SIGNATURE_INVALID', () => {
+  const { privateKey } = generateKeyPair()
+  const receipt = signCyclesPermitReceipt(
+    {
+      agent_id: 'agent-cycles-001',
+      delegation_ref: 'aps:delegation:cycles-admission-001',
+      action_ref: 'aps:action:cycles-admission-001',
+      reservation_id: 'rsv_admission_001',
+      reserved: { unit: 'USD_MICROCENTS', amount: 1500000 },
+      decision: 'ALLOW',
+      cycles_evidence: evidenceRef(),
+      authority_state_at_admission: ADMISSION_SNAPSHOT_FIXTURE,
+    },
+    privateKey,
+  )
+  // (b) flip delegation_revoked inside the inline object — the snapshot is
+  // part of the signed body, so the signature must catch it.
+  const tampered = {
+    ...receipt,
+    authority_state_at_admission: {
+      ...receipt.authority_state_at_admission!,
+      delegation_revoked: true,
+    },
+  }
+  const result = verifyCyclesPermitReceipt(tampered)
+  assert.equal(result.valid, false)
+  if (!result.valid) assert.equal(result.reason, 'SIGNATURE_INVALID')
+})
+
+test('signCyclesPermitReceipt: WITHOUT the snapshot → field absent, receipt verifies unchanged', () => {
+  const { privateKey } = generateKeyPair()
+  const receipt = signCyclesPermitReceipt(
+    {
+      agent_id: 'agent-cycles-001',
+      delegation_ref: 'aps:delegation:cycles-001',
+      action_ref: 'aps:action:cycles-001',
+      reservation_id: 'rsv_no_snapshot',
+      reserved: { unit: 'USD_MICROCENTS', amount: 1000 },
+      decision: 'ALLOW',
+      cycles_evidence: evidenceRef(),
+    },
+    privateKey,
+  )
+  // (c) callers that pass nothing get the field absent from the object (so
+  // existing fixtures/canonical bytes are unchanged) and verify.
+  assert.equal(Object.prototype.hasOwnProperty.call(receipt, 'authority_state_at_admission'), false)
+  assert.deepEqual(verifyCyclesPermitReceipt(receipt), { valid: true })
 })
