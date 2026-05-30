@@ -2,7 +2,7 @@
 // Agent Attestation Architecture — Core Functions
 // Phase 1: Foundation types + issuance challenge + grade computation + attestation binding
 
-import { createHash } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 import { sign, verify, publicKeyFromPrivate } from '../crypto/keys.js'
 import { canonicalize } from './canonical.js'
 import type {
@@ -38,8 +38,8 @@ export function createIssuanceChallenge(
   const expiry = new Date(now.getTime() + (options?.expiresInSeconds ?? 300) * 1000)
 
   return {
-    challengeId: `ic_${sha256Hex(Date.now().toString() + Math.random().toString()).slice(0, 24)}`,
-    nonce: sha256Hex(Math.random().toString() + Date.now().toString()).slice(0, 32),
+    challengeId: `ic_${sha256Hex(randomBytes(32).toString('hex')).slice(0, 24)}`,
+    nonce: sha256Hex(randomBytes(32).toString('hex')).slice(0, 32),
     requiredPublicKeyHash: publicKeyHash,
     requestedAttestationClasses: options?.requestedClasses ?? ['runtime'],
     expiresAt: expiry.toISOString(),
