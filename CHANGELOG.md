@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.6.0-alpha.8
+- feat(payment-rails/cycles): optional authority_state_at_admission snapshot on the permit receipt (#41)
+
 ## 2.6.0-alpha.4 (unreleased)
 
 ### Security
