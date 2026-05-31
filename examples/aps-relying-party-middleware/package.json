@@ -1,0 +1,18 @@
+{
+  "name": "aps-relying-party-middleware-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reference Express and Fastify middleware that verifies an APS passport and scope and drops unauthorized traffic before application logic. Wraps the framework-agnostic gate shipped in agent-passport-system (src/v2/offline-verifier/middleware). Reference only: install the deps below in your own project, do not run it from the SDK repo root.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "note": "This is an isolated example with its own dependency closure. The SDK repo does not install these. Copy this folder into your project, npm install, and wire the adapter into your server."
+  },
+  "peerDependencies": {
+    "agent-passport-system": ">=2.6.0-alpha"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "fastify": "^4.28.1"
+  }
+}
