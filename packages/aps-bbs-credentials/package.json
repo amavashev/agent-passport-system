@@ -1,0 +1,33 @@
+{
+  "name": "@aeoess/aps-bbs-credentials",
+  "version": "0.0.0-experimental.0",
+  "private": true,
+  "description": "EXPERIMENTAL, ISOLATED. BBS selective-disclosure over BLS12-381 for proving a scope subset without revealing the full delegation chain. NOT core-reviewed crypto. NOT imported by core. Crypto-review burden is outstanding.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "npx tsx --test tests/selective-disclosure.test.ts"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@grottonetworking/bbs-signatures": "0.1.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "keywords": ["bbs", "bls12-381", "selective-disclosure", "experimental", "zero-knowledge", "credential"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aeoess/agent-passport-system",
+    "directory": "packages/aps-bbs-credentials"
+  }
+}
