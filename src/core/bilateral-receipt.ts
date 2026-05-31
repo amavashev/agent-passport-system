@@ -51,6 +51,10 @@ export function createBilateralReceipt(opts: {
   servingAgentPrivateKey: string
   gatewayPrivateKey?: string
   evidenceCommitments?: EvidenceCommitment[]
+  // Additive optional slot. When omitted the body and signatures are unchanged
+  // (canonicalize() strips undefined keys), so receipts that do not carry a
+  // field-disclosure profile keep their exact prior bytes.
+  fieldDisclosureProfile?: unknown
 }): BilateralReceipt {
   const now = new Date().toISOString()
 
@@ -66,6 +70,7 @@ export function createBilateralReceipt(opts: {
     completedAt: opts.completedAt,
     agreedAt: now,
     evidenceCommitments: opts.evidenceCommitments,
+    fieldDisclosureProfile: opts.fieldDisclosureProfile,
   }
 
   // Both agents sign the SAME canonical body
