@@ -1770,3 +1770,25 @@ export type {
 
 // M5 policy-bundle (added at merge time; module omitted its own root export)
 export * from './v2/policy-bundle/index.js'
+
+// W2-B2 Remote Signer adapters - pluggable async Signer over the unchanged
+// Ed25519 default. Cloud adapters (AWS KMS, Azure Key Vault, Vault Transit,
+// PKCS#11) live in the isolated optional package packages/aps-remote-signer and
+// are not exported here (core ships no cloud SDK).
+export {
+  type Signer,
+  type SignerHandle,
+  RemoteSignerError,
+  defaultKeyId,
+  assertRawEd25519SignatureHex,
+  LocalEd25519Signer,
+  createLocalSigner,
+  type LocalSignerOptions,
+  HandleSigner,
+  createHandleSigner,
+  type HandleSignerOptions,
+  type RemoteSignFn,
+  type RemotePublicKeyFn,
+  verifyWithSigner,
+  buildRemoteSignerScopeOfClaim,
+} from './adapters/remote-signer/index.js'
