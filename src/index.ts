@@ -329,6 +329,20 @@ export {
   passportToDIDDocument as passportToDIDKeyDocument,
 } from './core/did-interop.js'
 
+// ── Key Resolution (M3): KeyResolver interface + did:cycles/JWKS ──
+export {
+  CyclesKeyResolver,
+  parseDIDCycles, isDIDCycles, asJWKS, selectKey,
+  decodeBase64Url, bytesToHex as keyResolutionBytesToHex,
+  DEFAULT_TIMEOUT_MS as KEY_RESOLUTION_DEFAULT_TIMEOUT_MS,
+  DEFAULT_CACHE_POLICY as KEY_RESOLUTION_DEFAULT_CACHE_POLICY,
+} from './v2/key-resolution/index.js'
+export type {
+  KeyResolver, KeyResolution, KeyResolutionStatus, KeyLocator,
+  FailurePolicy, CachePolicy, KeyResolverConfig,
+  Ed25519JWK, JWKS, ParsedDIDCycles, JWKSelection,
+} from './v2/key-resolution/index.js'
+
 // ── Identity Bridge: SPIFFE + OAuth → APS ──
 export {
   parseSPIFFEID, importSPIFFESVID,
