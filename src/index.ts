@@ -1469,6 +1469,47 @@ export type {
   MCPToolCallAuthCheck,
 } from './adapters/mutual-auth-mcp.js'
 
+// ── W2-B1: Trust Root Policy + trust_policy_ref ──
+// A signed, anti-rollback trust-root-policy artifact, a verifier that
+// derives a relying-party verdict for a receipt's signer, and the
+// did:web .well-known/aps-agents.json discovery convention + generator.
+// Extends mutual-auth trust anchors and the M3 key resolver; ships the
+// artifact + verifier + convention, not a hosted resolution service.
+export {
+  TRUST_ROOT_POLICY_SPEC_VERSION,
+  buildTrustRootPolicy,
+  signTrustRootPolicy,
+  verifyTrustRootPolicy,
+  evaluateReceiptAgainstPolicy,
+  WELL_KNOWN_APS_AGENTS_PATH,
+  APS_AGENTS_DOC_SPEC_VERSION,
+  generateApsAgentsDoc,
+  apsAgentsUrl,
+} from './v2/trust-policy/index.js'
+
+export type {
+  PinnedKey,
+  TrustedIssuer,
+  ResolverRule,
+  RotationRule,
+  StaleBehavior,
+  OfflineBehavior,
+  TrustRootPolicyBody,
+  TrustRootPolicy,
+  PolicyVerifyReason,
+  PolicyVerifyOutcome,
+  TrustPolicyVerdictReason,
+  TrustPolicyStatus,
+  TrustPolicyVerdict,
+  BuildTrustRootPolicyInput,
+  VerifyTrustRootPolicyOptions,
+  ReceiptSignerFacts,
+  EvaluateOptions,
+  ApsAgentEntry,
+  ApsAgentsDoc,
+  GenerateApsAgentsInput,
+} from './v2/trust-policy/index.js'
+
 // ── v2.4-alpha — InstructionProvenanceReceipt (Paper 8 candidate) ──
 // Spec: ~/aeoess_web/specs/INSTRUCTION-PROVENANCE-RECEIPT-DRAFT-v0.2.md
 // Tier scope this version: 'self-asserted' only.
