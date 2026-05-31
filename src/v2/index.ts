@@ -377,3 +377,27 @@ export type {
   APSBundle,
   BundledReceiptRef,
 } from './accountability/index.js'
+
+// v2 Scope Dimension Registry. Classifies delegation dimensions into strict
+// decidable (routed into the M6 feasibility hard obligation) vs advisory
+// (excluded from the hard check). Ships data_class and destination as new
+// decidable set-narrowing dimensions. Extends src/v2/feasibility; does not
+// duplicate its constraint emission.
+export {
+  SCOPE_REGISTRY_VERSION,
+  CANONICAL_DIMENSIONS,
+  buildRegistry,
+  classifyDimensions,
+  compileStrictDimensions,
+  checkSetNarrowing,
+  canHardDeny,
+} from './scope-registry/index.js'
+export type {
+  DimensionValueType,
+  EnforcementStrength,
+  DimensionDeclaration,
+  DimensionAssignment,
+  DimensionClassification,
+  DimensionNarrowingResult,
+  ScopeDimensionRegistry,
+} from './scope-registry/index.js'
