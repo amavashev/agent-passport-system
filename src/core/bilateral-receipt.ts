@@ -51,6 +51,13 @@ export function createBilateralReceipt(opts: {
   servingAgentPrivateKey: string
   gatewayPrivateKey?: string
   evidenceCommitments?: EvidenceCommitment[]
+  /**
+   * Optional audience binding. When set, both co-signers sign over it and the
+   * receipt is bound to the named recipient(s). When omitted, the canonical
+   * body (and therefore both signatures) is byte-identical to a receipt without
+   * audience binding, since canonicalize() omits undefined keys.
+   */
+  aud?: import('../types/bilateral-receipt.js').BilateralReceipt['aud']
 }): BilateralReceipt {
   const now = new Date().toISOString()
 
@@ -66,6 +73,7 @@ export function createBilateralReceipt(opts: {
     completedAt: opts.completedAt,
     agreedAt: now,
     evidenceCommitments: opts.evidenceCommitments,
+    aud: opts.aud,
   }
 
   // Both agents sign the SAME canonical body

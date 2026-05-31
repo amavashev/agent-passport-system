@@ -137,6 +137,16 @@ export interface V2Delegation {
    * delegator as fallback.
    */
   responsibility_anchor?: ResponsibilityAnchor
+  /**
+   * Optional audience binding. When present, the delegation is bound to the
+   * named recipient identifier(s) and a verifier rejects it when presented to
+   * any other recipient (see src/v2/audience-binding). Additive and versioned:
+   * a delegation that OMITS this field signs and serializes byte-for-byte as it
+   * did before audience binding existed, so existing delegations remain valid.
+   * The slot is optional-until-profile-required: a verifier policy may require
+   * it (requireAudience), but it is never issuer-asserted assurance.
+   */
+  aud?: import('./audience-binding/types.js').AudienceBinding
 }
 
 // ── Outcome Record ──

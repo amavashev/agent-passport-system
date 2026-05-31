@@ -10,6 +10,7 @@ import { signObject, verifyObject, isPolicyContextActive, isPolicyContextInGrace
 import type {
   PolicyContext, V2Delegation, V2ScopeDefinition, V2DelegationStatus, AssuranceClass,
 } from './types.js'
+import type { AudienceBinding } from './audience-binding/types.js'
 
 // ═══════════════════════════════════════════════
 // STORE
@@ -42,6 +43,13 @@ export interface CreateV2DelegationParams {
   scope: V2ScopeDefinition
   policy_context: PolicyContext
   delegator_private_key: string
+  /**
+   * Optional audience binding. When set, the delegation is bound to the named
+   * recipient(s) and signed over the binding. When omitted, the signed bytes
+   * are identical to a pre-audience-binding delegation. See
+   * src/v2/audience-binding.
+   */
+  aud?: AudienceBinding
 }
 
 export function createV2Delegation(params: CreateV2DelegationParams): V2Delegation {
@@ -59,6 +67,9 @@ export function createV2Delegation(params: CreateV2DelegationParams): V2Delegati
     expansion_reviewer: null,
     expansion_review_sig: null,
     assurance_class: 'mechanically_enforceable' as AssuranceClass,
+    // Additive: only present (and only in the signed bytes) when supplied, so
+    // audience-free delegations keep byte-identical signatures.
+    ...(params.aud !== undefined ? { aud: params.aud } : {}),
   }
   const signature = signObject(data, params.delegator_private_key)
   const delegation: V2Delegation = { ...data, signature } as V2Delegation
@@ -106,6 +117,12 @@ export interface SupersedeV2DelegationParams {
   expansion_reviewer?: string
   expansion_reviewer_private_key?: string
   renewal_reason?: string
+  /**
+   * Optional audience binding for the superseding delegation. When omitted, the
+   * original delegation's binding (if any) is carried forward unchanged so a
+   * renewal does not silently drop the audience restriction.
+   */
+  aud?: AudienceBinding
 }
 
 export function supersedeV2Delegation(params: SupersedeV2DelegationParams): V2Delegation {
@@ -125,6 +142,10 @@ export function supersedeV2Delegation(params: SupersedeV2DelegationParams): V2De
     }
   }
 
+  // Carry the original audience binding forward unless explicitly overridden,
+  // so a renewal/supersession never silently widens the audience.
+  const carriedAud = params.aud ?? original.aud
+
   const newData: Record<string, unknown> = {
     id: uuidv4(),
     version: original.version + 1,
@@ -138,6 +159,8 @@ export function supersedeV2Delegation(params: SupersedeV2DelegationParams): V2De
     renewal_reason: params.renewal_reason || null,
     expansion_reviewer: isExpansion ? params.expansion_reviewer! : null,
     assurance_class: isExpansion ? 'evidentially_auditable' : 'mechanically_enforceable',
+    // Additive: present only when the original or the call supplied a binding.
+    ...(carriedAud !== undefined ? { aud: carriedAud } : {}),
   }
 
   const signature = signObject(newData, params.delegator_private_key)
