@@ -361,6 +361,12 @@ export {
   verifyCyclesReleaseReceiptWithDID,
   verifyCyclesDenial,
   verifyCyclesDenialWithDID,
+  verifyCyclesPermitReceiptWithEvidence,
+  verifyCyclesReleaseReceiptWithEvidence,
+  verifyCyclesDenialWithEvidence,
+  resolveEvidenceRef,
+  recomputeEvidenceContentHash,
+  toEvidenceDescriptorInput,
 } from './cycles/index.js'
 export type {
   CyclesArtifactType,
@@ -380,3 +386,15 @@ export type {
   SignCyclesReleaseReceiptInput,
   VerifyCyclesOptions,
 } from './cycles/types.js'
+export type { CyclesVerifyWithEvidenceResult } from './cycles/index.js'
+export type {
+  EvidenceResolver,
+  EvidenceFetchResult,
+  EvidenceResolutionResult,
+  EvidenceResolutionStatus,
+  EvidenceFailurePolicy,
+  ResolveEvidenceConfig,
+  FetchedCyclesEvidenceEnvelope,
+  EvidenceDescriptorInput,
+  EvidenceObservationBasis,
+} from './cycles/index.js'
