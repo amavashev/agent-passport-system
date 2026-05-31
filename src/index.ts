@@ -781,6 +781,29 @@ export type {
 } from './types/feasibility.js'
 
 
+// ── Hash-and-Pointer Payloads + Field-Disclosure Profile (W2-B6) ──
+
+export {
+  REDACTED_SENTINEL,
+  buildFieldDisclosureProfile,
+  verifyFieldDisclosureProfile,
+  canonicalProfileBytes,
+  bbsProofToFieldDisclosureRef,
+  fieldDisclosureRefToBbsProof,
+} from './v2/hash-pointer/index.js'
+export type {
+  FieldDisclosurePolicy,
+  HashPointerAlgorithm,
+  HashPointerPayload,
+  DisclosedField,
+  FieldDisclosureProofRef,
+  FieldDisclosureProfile,
+  BuildFieldDisclosureProfileInput,
+  FieldDisclosureVerification,
+  BbsDisclosureProofShape,
+} from './v2/hash-pointer/index.js'
+
+
 // ── Governance Artifact Provenance (Module 21) ──
 
 export {

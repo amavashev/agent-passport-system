@@ -58,6 +58,10 @@ export function createBilateralReceipt(opts: {
    * audience binding, since canonicalize() omits undefined keys.
    */
   aud?: import('../types/bilateral-receipt.js').BilateralReceipt['aud']
+  // Additive optional slot. When omitted the body and signatures are unchanged
+  // (canonicalize() strips undefined keys), so receipts that do not carry a
+  // field-disclosure profile keep their exact prior bytes.
+  fieldDisclosureProfile?: unknown
 }): BilateralReceipt {
   const now = new Date().toISOString()
 
@@ -74,6 +78,7 @@ export function createBilateralReceipt(opts: {
     agreedAt: now,
     evidenceCommitments: opts.evidenceCommitments,
     aud: opts.aud,
+    fieldDisclosureProfile: opts.fieldDisclosureProfile,
   }
 
   // Both agents sign the SAME canonical body

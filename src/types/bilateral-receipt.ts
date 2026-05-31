@@ -59,6 +59,15 @@ export interface BilateralReceipt {
    * existing receipts remain valid. Both co-signers sign over it when present.
    */
   aud?: import('../v2/audience-binding/types.js').AudienceBinding
+  // Field-disclosure profile (additive, versioned slot).
+  // Commits to a payload by hash + URI with a per-field disclosure policy so
+  // raw sensitive payloads are never embedded. Optional: a receipt that omits
+  // it is byte-identical to one built before this slot existed (canonicalize
+  // strips undefined keys), so existing receipt signatures are unaffected.
+  // Shape: FieldDisclosureProfile from src/v2/hash-pointer. Typed as unknown
+  // here to keep this v1 type file free of a v2 import; the builder and
+  // verifier in src/v2/hash-pointer carry the concrete type.
+  fieldDisclosureProfile?: unknown
 }
 
 // ── Evidence Commitment ──
