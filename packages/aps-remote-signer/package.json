@@ -1,0 +1,34 @@
+{
+  "name": "@aeoess/aps-remote-signer",
+  "version": "0.0.0-experimental.0",
+  "private": true,
+  "description": "OPTIONAL, ISOLATED. Remote signer adapters (AWS KMS, Azure Key Vault, Vault Transit, PKCS#11) over the APS Signer abstraction. The raw private key never materializes in process; each adapter reduces to a HandleSigner holding only a key handle plus backend callbacks. NOT imported by core. Cloud SDKs are optional and injected by the caller.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "npx tsx --test tests/adapters.test.ts"
+  },
+  "license": "Apache-2.0",
+  "peerDependencies": {
+    "agent-passport-system": ">=2.6.0-alpha.0"
+  },
+  "devDependencies": {
+    "agent-passport-system": "file:../../",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "keywords": ["kms", "hsm", "remote-signer", "aws-kms", "azure-key-vault", "vault-transit", "pkcs11", "ed25519", "experimental"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aeoess/agent-passport-system",
+    "directory": "packages/aps-remote-signer"
+  }
+}
