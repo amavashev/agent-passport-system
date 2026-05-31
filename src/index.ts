@@ -1767,3 +1767,6 @@ export type {
   SignMppReceiptInput,
   VerifyMppOptions,
 } from './v2/payment-rails/index.js'
+
+// M5 policy-bundle (added at merge time; module omitted its own root export)
+export * from './v2/policy-bundle/index.js'
