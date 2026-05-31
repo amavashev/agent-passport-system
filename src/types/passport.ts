@@ -142,6 +142,12 @@ export interface ActionReceipt {
   witnessSignature?: string
   /** Optional: hash of previous receipt in chain (for append-only chain verification) */
   previousReceiptHash?: string
+  /** M4. Optional monotonic sequence number within an issuer's receipt stream.
+   *  Combined with `previousReceiptHash`, a gap (a missing number, or a broken
+   *  hash link) makes a deleted or withheld receipt detectable. Mirrors the
+   *  messaging-audit `sequenceNumber` pattern. Optional for back-compat;
+   *  receipts without it canonicalize and verify unchanged. */
+  sequenceNumber?: number
   /** If tombstoned (GDPR), payload is redacted but hash chain and signature preserved */
   tombstoned?: boolean
   tombstoneReason?: string

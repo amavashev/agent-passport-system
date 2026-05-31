@@ -4,6 +4,7 @@ import { verify } from '../crypto/keys.js'
 import { canonicalize } from '../core/canonical.js'
 import { isExpired } from '../core/passport.js'
 import type { SignedPassport, VerificationResult, Challenge } from '../types/passport.js'
+import type { CoreVerifyClockOptions } from '../types/policy.js'
 import { randomBytes } from 'node:crypto'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -15,7 +16,15 @@ import { v4 as uuidv4 } from 'uuid'
  */
 export function verifyPassport(
   signed: SignedPassport,
-  opts?: { trustedIssuers?: string[] },
+  opts?: {
+    trustedIssuers?: string[]
+    /** M4. Uniform clock-skew option. When provided, passport expiry is
+     *  tolerated within `allowedClockSkewMs` of the verifier clock. Omitting
+     *  it preserves the prior exact-boundary behavior. This consolidates the
+     *  per-verifier skews in ap2 (`clock_skew_seconds`) and
+     *  instruction-provenance (`clockSkewMs`); those remain available. */
+    clock?: CoreVerifyClockOptions
+  },
 ): VerificationResult {
   const errors: string[] = []
   const warnings: string[] = []
@@ -57,8 +66,25 @@ export function verifyPassport(
     warnings.push('No trustedIssuers provided — self-signed passports are accepted')
   }
 
-  // Check expiration
-  if (isExpired(passport)) {
+  // Check expiration. Default path keeps the exact prior behavior. When a
+  // uniform clock skew is supplied, the passport is considered live until
+  // `expiresAt` is older than (now - skew), and notBefore is honored within
+  // (now + skew). This is the one millisecond-based skew option callers can
+  // thread uniformly across verifiers.
+  if (opts?.clock?.allowedClockSkewMs !== undefined) {
+    const skewMs = opts.clock.allowedClockSkewMs
+    const nowMs = (opts.clock.now ?? new Date()).getTime()
+    const expMs = Date.parse(passport.expiresAt)
+    if (!Number.isNaN(expMs) && expMs < nowMs - skewMs) {
+      errors.push(`Passport expired at ${passport.expiresAt}`)
+    }
+    if (passport.notBefore) {
+      const nbfMs = Date.parse(passport.notBefore)
+      if (!Number.isNaN(nbfMs) && nbfMs > nowMs + skewMs) {
+        errors.push(`Passport not valid before ${passport.notBefore}`)
+      }
+    }
+  } else if (isExpired(passport)) {
     errors.push(`Passport expired at ${passport.expiresAt}`)
   }
 

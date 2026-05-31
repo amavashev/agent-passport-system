@@ -11,8 +11,63 @@
 // "here's proof of what was checked."
 // ══════════════════════════════════════════════════════════════════
 
-import type { EnforcementMode } from './passport.js'
+import type { EnforcementMode, AttestationFreshness } from './passport.js'
 import type { ContentHash, EvaluationMethod } from './decision-semantics.js'
+
+// ══════════════════════════════════════════════════════════════════
+// M4. Verifier production-hardening (additive, optional)
+// ══════════════════════════════════════════════════════════════════
+// These types are consumed by the reference verifier-hardening module at
+// src/v2/verifier-hardening/. They are all optional on the wire. A v2.2.x
+// receipt without `revocation_freshness` canonicalizes and verifies
+// unchanged. The action_ref preimage and existing receipt signing are
+// untouched: `revocation_freshness` is recorded ALONGSIDE the receipt as a
+// new optional field, never folded into any existing signed digest.
+//
+// Claims language: this metadata is "specified / tested / validated", it is
+// not "proved". See the proof box in src/v2/verifier-hardening/index.ts.
+
+/** Result of a revocation-freshness check at verification time.
+ *  - 'fresh': the revocation source was checked and is within max staleness.
+ *  - 'stale': the source was checked but is older than the allowed window.
+ *  - 'unavailable': the source could not be reached at verification time.
+ *  - 'skipped': the verifier chose not to check (documented integrator policy). */
+export type RevocationFreshnessResult = 'fresh' | 'stale' | 'unavailable' | 'skipped'
+
+/** Recorded outcome of the revocation-freshness check, attached to a policy
+ *  receipt as an optional field. Reuses {@link AttestationFreshness} for the
+ *  staleness shape rather than inventing a parallel one. */
+export interface RevocationFreshnessRecord {
+  /** ISO 8601 timestamp of when the verifier consulted the revocation source. */
+  checkedAt: string
+  /** Identifier for the revocation source consulted (e.g. a CRL URL, a
+   *  registry id, 'in-memory'). Not a service; the integrator supplies it. */
+  source: string
+  /** Reused staleness metadata. `validAt` is when the source data was
+   *  produced; `maxAge` / `ttl` express the max staleness the verifier
+   *  tolerated. Present whenever the source reported its own age. */
+  freshness?: AttestationFreshness
+  /** Maximum staleness the verifier was willing to accept, in milliseconds.
+   *  Documented so a reader knows the threshold that produced `result`. */
+  maxStalenessMs: number
+  /** The outcome of the check. */
+  result: RevocationFreshnessResult
+  /** True when the verifier proceeded even though `result` was 'stale' or
+   *  'unavailable'. Records an explicit, auditable risk acceptance. */
+  allowedDespiteStale: boolean
+}
+
+/** Uniform clock-skew option for the core verify path. Consolidates the
+ *  per-verifier skews that already exist (ap2 `clock_skew_seconds`,
+ *  instruction-provenance `clockSkewMs`). Those remain as-is; this is the
+ *  one millisecond-based option a caller can thread uniformly. */
+export interface CoreVerifyClockOptions {
+  /** Allowed clock skew in milliseconds for timestamp comparisons.
+   *  When omitted, callers fall back to their existing per-verifier default. */
+  allowedClockSkewMs?: number
+  /** Verifier clock; defaults to the current time when omitted. */
+  now?: Date
+}
 
 // ── Action Intent ──
 // Before executing, the agent declares intent. This is the request.
@@ -151,6 +206,11 @@ export interface PolicyReceipt {
    *  v2.3 emitters populate this; v2.3 verifiers prefer it when present; v2.2.x
    *  consumers ignore it silently. Optional for back-compat. */
   epistemic_claims?: EpistemicClaims
+  /** M4. Recorded outcome of the revocation-freshness check performed at
+   *  verification time. Optional; absence means the verifier did not record a
+   *  freshness check. Carried alongside the receipt; does NOT alter the
+   *  action_ref preimage or any existing signed digest. */
+  revocation_freshness?: RevocationFreshnessRecord
   signature: string         // signed by the verifier
 }
 
