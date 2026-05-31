@@ -1169,6 +1169,31 @@ export type {
   TaintedRecord, TaintedSet, TaintCandidate,
 } from './v2/downstream-taint.js'
 
+// ══════════════════════════════════════
+// Offline verifier (W2-C2) - zero-network verify path + descriptor
+// ══════════════════════════════════════
+// A standalone APS verify path with no network dependency. It composes the
+// existing crypto-layer receipt verifier with the promoted context-layer
+// verifier and emits the W2-A1 Evidence Descriptor (a verifier OUTPUT, not
+// an issuer field). Ships alongside a framework-agnostic relying-party gate
+// (Express/Fastify adapters in examples/aps-relying-party-middleware) and a
+// conformance runner over the canonicalization vectors.
+export {
+  verifyOffline,
+  verifyReceiptContext, CRYPTO_LAYER_REASONS,
+  buildDescriptor,
+  evaluateRequest, runGate,
+  runCanonicalizationConformance, checkCanonicalizationVector, summarize,
+} from './v2/offline-verifier/index.js'
+export type {
+  OfflineVerifyOptions, OfflineVerifyResult, OfflineVerifyVerdict, OfflineDescriptorInputs,
+  RejectReason, ReceiptContext, ContextVerifyResult,
+  BuildDescriptorInput, EvidenceDescriptor, SignerClaim, WitnessObservationFact,
+  CheckedSignature, IndependenceRelation, SignerNode, SignerGraph, DescriptorBuilder,
+  GateDecision, GateDenyReason, GateOptions, GateRequestLike, GateResponseLike,
+  ConformanceCheck, ConformanceRunnerResult,
+} from './v2/offline-verifier/index.js'
+
 // NOTE: 'ActionReceipt' name collides with the legacy commerce-flavored
 // ActionReceipt re-exported at line 129 (from './types/passport.js'). Alias
 // the new accountability one as 'AccountabilityActionReceipt' to preserve

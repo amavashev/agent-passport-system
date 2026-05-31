@@ -33,9 +33,26 @@ import { createHash } from 'node:crypto'
 import { canonicalizeJCS } from '../../src/core/canonical-jcs.js'
 import { sign, publicKeyFromPrivate } from '../../src/crypto/keys.js'
 import { createActionReceipt } from '../../src/v2/accountability/construct/action.js'
-import { verifyActionReceipt } from '../../src/v2/accountability/verify/action.js'
 import type { ActionReceipt } from '../../src/v2/accountability/types/action.js'
 import type { ScopeOfClaim } from '../../src/v2/accountability/types/base.js'
+// The reason taxonomy, the verifier context shape, and the context-layer
+// verifier are now shippable SDK surface. The generator imports them so
+// the golden fixtures stay pinned to exactly the code path a relying
+// party runs, and re-exports them so existing consumers (the negatives
+// test) keep their import sites unchanged.
+import {
+  verifyReceiptContext,
+  type RejectReason,
+  type ReceiptContext,
+  type ContextVerifyResult,
+} from '../../src/v2/offline-verifier/context.js'
+
+export {
+  verifyReceiptContext,
+  type RejectReason,
+  type ReceiptContext,
+  type ContextVerifyResult,
+}
 
 // ── Pinned deterministic key material (test-only, never production) ──
 // 32-byte Ed25519 private keys, hex. Distinct signer and principal so
@@ -67,121 +84,12 @@ const SCOPE: ScopeOfClaim = {
   self_attested: false,
 }
 
-// ── Reasons a conformant verifier rejects a receipt ─────────────────
-// The crypto layer (verifyActionReceipt) closes three modes directly.
-// The remaining modes are CONTEXT rejections: the signature is fine but
-// the receipt is being used outside the envelope it was issued for. A
-// conformant verifier MUST apply both layers.
-export type RejectReason =
-  // crypto-layer (verifyActionReceipt)
-  | 'INVALID_CLAIM_TYPE'
-  | 'RECEIPT_ID_MISMATCH' // mismatched-hash / tampered body
-  | 'SIGNATURE_INVALID' // invalid signature
-  // context-layer (verifyReceiptContext)
-  | 'DELEGATION_EXPIRED' // expired delegation
-  | 'DELEGATION_REVOKED' // revoked / stale revocation not honored
-  | 'OVER_BUDGET' // over-budget action
-  | 'WRONG_PRINCIPAL' // wrong-principal: receipt principal != asserted beneficiary
-  | 'STALE_POLICY' // policy version evaluated is older than the active one
-  | 'REPLAYED' // receipt_id already seen in this verification window
-  | 'WRONG_CLAIM' // valid receipt presented as proof of a claim it does not make
-  | 'POLICY_NOT_EXECUTED' // policy evaluated but execution never happened
-
-// Context an external verifier checks the receipt against. None of this
-// is inside the signed bytes; it is the verifier's own ground truth.
-export interface ReceiptContext {
-  now: string
-  /** Delegation chain root the verifier currently treats as authoritative. */
-  active_delegation_root: string
-  /** Delegation expiry, ISO 8601. Receipt timestamp must be at or before this. */
-  delegation_expires_at: string
-  /** Delegation roots the verifier has seen revoked. */
-  revoked_delegation_roots: string[]
-  /** Budget ceiling, integer base units. */
-  budget_base_units: bigint
-  /** Cost the receipt's action draws against the budget, base units. */
-  action_cost_base_units: bigint
-  /** Principal the verifier expects to be accountable. */
-  expected_principal_did: string
-  /** Policy version the verifier currently enforces. */
-  active_policy_version: number
-  /** Policy version actually evaluated, carried in the receipt's policy_ref. */
-  evaluated_policy_version: number
-  /** receipt_ids the verifier has already accepted in this window. */
-  seen_receipt_ids: string[]
-  /** The claim the receipt is being presented to support. */
-  presented_as_claim_type: string
-  /** Whether an execution attestation accompanies the policy decision. */
-  execution_attested: boolean
-}
-
-export interface ContextVerifyResult {
-  valid: boolean
-  reason?: RejectReason
-}
-
-/**
- * Context-layer verification. Runs the crypto verifier first, then the
- * verifier-responsibility checks an external party MUST apply before
- * treating a receipt as authoritative. Order matters: a tampered or
- * unsigned receipt is rejected before any context is consulted.
- */
-export function verifyReceiptContext(
-  receipt: ActionReceipt,
-  ctx: ReceiptContext,
-): ContextVerifyResult {
-  const crypto = verifyActionReceipt(receipt)
-  if (!crypto.valid) {
-    return { valid: false, reason: crypto.reason as RejectReason }
-  }
-
-  // wrong-claim: the receipt is sound but does not make the claim it is
-  // being presented to support.
-  if (ctx.presented_as_claim_type !== receipt.claim_type) {
-    return { valid: false, reason: 'WRONG_CLAIM' }
-  }
-
-  // wrong-principal: receipt accountable party is not the expected one.
-  if (receipt.agent_did !== ctx.expected_principal_did) {
-    return { valid: false, reason: 'WRONG_PRINCIPAL' }
-  }
-
-  // revoked delegation: cascade revocation must be honored even if the
-  // receipt itself is older than the revocation event.
-  if (ctx.revoked_delegation_roots.includes(receipt.delegation_chain_root)) {
-    return { valid: false, reason: 'DELEGATION_REVOKED' }
-  }
-
-  // expired delegation: the receipt was issued after the chain expired.
-  if (receipt.timestamp > ctx.delegation_expires_at) {
-    return { valid: false, reason: 'DELEGATION_EXPIRED' }
-  }
-
-  // over-budget: the action draws more than the ceiling allows.
-  if (ctx.action_cost_base_units > ctx.budget_base_units) {
-    return { valid: false, reason: 'OVER_BUDGET' }
-  }
-
-  // stale-policy: the policy version evaluated is older than the active
-  // one the verifier now enforces.
-  if (ctx.evaluated_policy_version < ctx.active_policy_version) {
-    return { valid: false, reason: 'STALE_POLICY' }
-  }
-
-  // replay: the receipt_id has already been accepted in this window.
-  if (ctx.seen_receipt_ids.includes(receipt.receipt_id)) {
-    return { valid: false, reason: 'REPLAYED' }
-  }
-
-  // policy-evaluated-but-never-executed: a policy decision is not a
-  // proof that the gated action ran. Without an execution attestation
-  // the receipt cannot be treated as proof of execution.
-  if (!ctx.execution_attested) {
-    return { valid: false, reason: 'POLICY_NOT_EXECUTED' }
-  }
-
-  return { valid: true }
-}
+// The reason taxonomy (RejectReason), the verifier context shape
+// (ReceiptContext), and the context-layer verifier (verifyReceiptContext)
+// now live in src/v2/offline-verifier/context.ts as shippable SDK
+// surface. They are imported and re-exported above so this generator and
+// its consumers keep building the same bytes from the same code path a
+// relying party runs. Do not re-inline them here.
 
 // ── Golden fixture shapes ───────────────────────────────────────────
 

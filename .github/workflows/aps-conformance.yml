@@ -1,0 +1,56 @@
+name: APS conformance
+
+# Runs the W2-C2 conformance runner against the pinned canonicalization
+# vector corpus (specs/test-vectors-canonicalization.json) and the code
+# mirror getTestVectors(). A single-byte divergence in any expected_jcs,
+# expected_legacy, sha256_jcs, or sha256_legacy fails the job. This is the
+# CI gate behind the conformance badge in the README.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "specs/test-vectors-canonicalization.json"
+      - "src/core/canonical.ts"
+      - "src/core/canonical-jcs.ts"
+      - "src/v2/offline-verifier/**"
+      - "scripts/aps-conformance.mjs"
+      - ".github/workflows/aps-conformance.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "specs/test-vectors-canonicalization.json"
+      - "src/core/canonical.ts"
+      - "src/core/canonical-jcs.ts"
+      - "src/v2/offline-verifier/**"
+      - "scripts/aps-conformance.mjs"
+      - ".github/workflows/aps-conformance.yml"
+  workflow_dispatch: {}
+
+jobs:
+  canonicalization-vectors:
+    name: canonicalization vector byte-match
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node deps
+        run: npm ci || npm install
+
+      - name: Run conformance runner (fails on single-byte divergence)
+        # The CLI loads the pinned vectors corpus, asserts it is
+        # byte-identical to the code mirror getTestVectors(), runs the
+        # RFC 8785 JCS and legacy canonicalizers against every vector, and
+        # checks both pinned SHA-256 digests. Exit 1 on any divergence.
+        run: npx tsx scripts/aps-conformance.mjs
+
+      - name: Conformance runner unit tests
+        run: npx tsx --test tests/v2/offline-verifier/conformance-runner.test.ts
