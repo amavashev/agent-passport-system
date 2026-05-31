@@ -20,10 +20,10 @@ function makeFailure(facet: string, code: string, msg: string): ConstraintFailur
 }
 
 describe('Denial Domains — Facet-to-Domain Mapping', () => {
-  it('maps all 14 facets to domains', () => {
+  it('maps all 15 facets to domains', () => {
     const facets = [
       'identity', 'reputation', 'fidelity',
-      'scope', 'reversibility', 'escalation', 'revocation',
+      'scope', 'reversibility', 'escalation', 'revocation', 'audience',
       'spend', 'data',
       'time', 'replay', 'governance', 'cross_chain',
       'values',
@@ -45,6 +45,7 @@ describe('Denial Domains — Facet-to-Domain Mapping', () => {
     assert.strictEqual(getDomain('revocation'), 'authority_scope')
     assert.strictEqual(getDomain('escalation'), 'authority_scope')
     assert.strictEqual(getDomain('reversibility'), 'authority_scope')
+    assert.strictEqual(getDomain('audience'), 'authority_scope')
   })
 
   it('economic cluster maps correctly', () => {
@@ -133,8 +134,8 @@ describe('Denial Domains — Group By Domain', () => {
 })
 
 describe('Denial Domains — Evaluation Order', () => {
-  it('has all 14 facets in the evaluation order', () => {
-    assert.strictEqual(EVALUATION_ORDER.length, 14)
+  it('has all 15 facets in the evaluation order', () => {
+    assert.strictEqual(EVALUATION_ORDER.length, 15)
   })
 
   it('cheap checks come before expensive ones', () => {

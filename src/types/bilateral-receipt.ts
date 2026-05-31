@@ -50,6 +50,15 @@ export interface BilateralReceipt {
 
   // Evidence commitments (external attestations bound into the receipt)
   evidenceCommitments?: EvidenceCommitment[]
+
+  /**
+   * Optional audience binding. When present, this receipt is bound to the named
+   * recipient identifier(s); a verifier rejects it when presented to any other
+   * recipient (see src/v2/audience-binding). Additive and versioned: a receipt
+   * that OMITS this field signs and serializes byte-for-byte as before, so
+   * existing receipts remain valid. Both co-signers sign over it when present.
+   */
+  aud?: import('../v2/audience-binding/types.js').AudienceBinding
 }
 
 // ── Evidence Commitment ──

@@ -52,6 +52,7 @@ export type ConstraintFacet =
   | 'identity'       // passport verification, signature validity
   | 'replay'         // request ID reuse detection
   | 'cross_chain'    // taint tracking, confused deputy prevention
+  | 'audience'       // proof bound to a named recipient (reject A's proof at B)
   | 'escalation'     // bounded escalation grant validity
   | 'fidelity'       // substrate behavioral fidelity — is agent still operating as itself?
   | 'data'           // data source access terms, contribution tracking

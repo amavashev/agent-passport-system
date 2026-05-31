@@ -32,6 +32,7 @@ const FACET_DOMAIN: Record<ConstraintFacet, DenialDomain> = {
   reversibility:  'authority_scope',
   escalation:     'authority_scope',
   revocation:     'authority_scope',
+  audience:       'authority_scope',
   spend:          'economic',
   data:           'economic',
   time:           'temporal_integrity',
@@ -98,6 +99,7 @@ export const EVALUATION_ORDER: ConstraintFacet[] = [
   'reputation',    // O(1) tier lookup
   'reversibility', // O(1) classification
   'escalation',    // O(1) grant check
+  'audience',      // O(1) recipient-id membership (presentation layer)
   'cross_chain',   // O(1) taint check
   'governance',    // O(1) version check
   'data',          // O(n) data terms check
