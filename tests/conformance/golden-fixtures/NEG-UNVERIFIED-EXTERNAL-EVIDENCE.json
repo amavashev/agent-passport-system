@@ -1,0 +1,52 @@
+{
+  "kind": "negative",
+  "id": "NEG-UNVERIFIED-EXTERNAL-EVIDENCE",
+  "description": "A self-attested oracle read is presented as gateway-observed evidence. self_attested receipts carry lower evidentiary weight and must not be promoted to observed evidence.",
+  "expected_reject_reason": "WRONG_CLAIM",
+  "layer": "context",
+  "receipt": {
+    "claim_type": "aps:action:v1",
+    "receipt_id": "c2280990d72538fd7ef6beccf5e9e7c61eb7ad30013563ea38c4dca7a1d7386b",
+    "timestamp": "2026-05-01T12:00:00.000Z",
+    "signer_did": "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+    "scope_of_claim": {
+      "asserts": "aps:action:v1. the agent self-declares it took this action. No gateway or runtime attestation backs it.",
+      "does_not_assert": [
+        "that the off-protocol side effect actually completed",
+        "that the agent understood the consequences of the action",
+        "that the underlying business outcome was correct"
+      ],
+      "capture_mode": "self_attested",
+      "completeness": "complete",
+      "self_attested": true
+    },
+    "agent_did": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0",
+    "delegation_chain_root": "4444444444444444444444444444444444444444444444444444444444444444",
+    "policy_ref": "policy:v3",
+    "action": {
+      "kind": "external_oracle_read",
+      "target": "https://oracle.example.test/price",
+      "parameters": {
+        "claim": "price=100"
+      }
+    },
+    "side_effect_classes": [
+      "internal_only"
+    ],
+    "signature": "ed0dacfc49dbba45e6b3c5fdb1a9f84d9a5a05735bc87a9949a5ad41bf2f897681637fd458ca703d078ebcbd1b8424b7558bf8770bd3255d2e3d1d1f2c362609"
+  },
+  "context": {
+    "now": "2026-05-01T12:00:00.000Z",
+    "active_delegation_root": "4444444444444444444444444444444444444444444444444444444444444444",
+    "delegation_expires_at": "2027-01-01T00:00:00.000Z",
+    "revoked_delegation_roots": [],
+    "budget_base_units": "1000000",
+    "action_cost_base_units": "1000",
+    "expected_principal_did": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0",
+    "active_policy_version": 3,
+    "evaluated_policy_version": 3,
+    "seen_receipt_ids": [],
+    "presented_as_claim_type": "aps:gateway_observed:v1",
+    "execution_attested": true
+  }
+}

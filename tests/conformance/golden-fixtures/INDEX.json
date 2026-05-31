@@ -1,0 +1,83 @@
+{
+  "package": "aps-conformance-golden-negatives",
+  "version": 1,
+  "description": "Golden valid and negative fixtures for APS receipt verification. Each negative must be rejected for the stated reason by a conformant verifier.",
+  "fixed_now": "2026-05-01T12:00:00.000Z",
+  "golden_valid": [
+    "GOLD-VALID-001"
+  ],
+  "negatives": [
+    {
+      "id": "NEG-SIGNATURE-INVALID",
+      "reason": "SIGNATURE_INVALID",
+      "layer": "crypto",
+      "description": "Signature byte flipped. The Ed25519 signature no longer verifies under signer_did."
+    },
+    {
+      "id": "NEG-MISMATCHED-HASH",
+      "reason": "RECEIPT_ID_MISMATCH",
+      "layer": "crypto",
+      "description": "Action target rewritten after signing. receipt_id no longer equals sha256 of the canonical body."
+    },
+    {
+      "id": "NEG-WRONG-CLAIM-TYPE",
+      "reason": "INVALID_CLAIM_TYPE",
+      "layer": "crypto",
+      "description": "claim_type changed to aps:custody:v1. The action verifier rejects a receipt that is not aps:action:v1."
+    },
+    {
+      "id": "NEG-DELEGATION-EXPIRED",
+      "reason": "DELEGATION_EXPIRED",
+      "layer": "context",
+      "description": "Cryptographically sound receipt issued at 2026-05-01 against a delegation that expired 2026-04-01."
+    },
+    {
+      "id": "NEG-STALE-REVOCATION",
+      "reason": "DELEGATION_REVOKED",
+      "layer": "context",
+      "description": "The receipt is valid but its delegation chain root was revoked. A verifier that ignores stale revocation state would wrongly accept it."
+    },
+    {
+      "id": "NEG-OVER-BUDGET",
+      "reason": "OVER_BUDGET",
+      "layer": "context",
+      "description": "Action draws 1000 base units against a 500 base-unit ceiling. The spend gate rejects it."
+    },
+    {
+      "id": "NEG-WRONG-PRINCIPAL",
+      "reason": "WRONG_PRINCIPAL",
+      "layer": "context",
+      "description": "The receipt names PRINCIPAL_DID as accountable, but it is presented to discharge a duty owed by a different principal."
+    },
+    {
+      "id": "NEG-STALE-POLICY",
+      "reason": "STALE_POLICY",
+      "layer": "context",
+      "description": "The decision was made against policy v3 while the verifier now enforces v5. A stale-policy decision is not authoritative."
+    },
+    {
+      "id": "NEG-REPLAYED",
+      "reason": "REPLAYED",
+      "layer": "context",
+      "description": "A previously accepted receipt is replayed. The verifier MUST reject a receipt_id it has already honored in the window."
+    },
+    {
+      "id": "NEG-WRONG-CLAIM",
+      "reason": "WRONG_CLAIM",
+      "layer": "context",
+      "description": "A sound aps:action:v1 receipt is presented as an aps:payment_receipt:v1. A valid receipt does not prove a claim it never made."
+    },
+    {
+      "id": "NEG-POLICY-NOT-EXECUTED",
+      "reason": "POLICY_NOT_EXECUTED",
+      "layer": "context",
+      "description": "A policy decision exists but no execution attestation accompanies it. A permit is not a proof that the action ran."
+    },
+    {
+      "id": "NEG-UNVERIFIED-EXTERNAL-EVIDENCE",
+      "reason": "WRONG_CLAIM",
+      "layer": "context",
+      "description": "A self-attested oracle read is presented as gateway-observed evidence. self_attested receipts carry lower evidentiary weight and must not be promoted to observed evidence."
+    }
+  ]
+}
