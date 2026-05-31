@@ -340,6 +340,21 @@ export type {
   OAuthTokenInput, OAuthImportResult,
 } from './core/identity-bridge.js'
 
+// ── OAuth 2.1 / RFC 8693 Token Exchange delegation-token bridge ──
+export {
+  TOKEN_TYPE_URN, TOKEN_EXCHANGE_GRANT_TYPE, JWT_SVID_APPROVED_ALGS,
+  bridgeScopeOfClaim, isNarrowing, assertChainNarrows, effectiveScope,
+  chainToTokenExchangeClaims, tokenExchangeClaimsToChain, parseScope,
+  assertRoundTripNarrows, actorSatisfiesMayAct, currentActor,
+  validateSpiffeId, spiffeIdToDidInput, jwtSvidToDidInput,
+} from './adapters/oauth-rfc8693/index.js'
+
+export type {
+  ActClaim, MayActClaim, TokenExchangeClaims,
+  OAuthDelegationHop, DelegationChainView, RecoveredChain,
+  JwtSvidView, SpiffeIdentityInput,
+} from './adapters/oauth-rfc8693/index.js'
+
 // ── VC Wrapper: Interop Bridge (did:key + SPIFFE evidence) ──
 export {
   passportToVerifiableCredential,
