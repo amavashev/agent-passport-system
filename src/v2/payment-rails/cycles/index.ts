@@ -298,6 +298,9 @@ export function signCyclesPermitReceipt(
   if (input.authority_state_at_admission !== undefined) {
     unsigned.authority_state_at_admission = input.authority_state_at_admission
   }
+  if (input.trust_policy_ref !== undefined) {
+    unsigned.trust_policy_ref = input.trust_policy_ref
+  }
   const sigBytes = canonicalizeJCS(unsigned)
   const signature = sign(sigBytes, signerPrivateKeyHex)
   return { ...unsigned, signature }

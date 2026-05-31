@@ -186,6 +186,15 @@ export interface CyclesPermitReceipt {
    *  Optional so existing fixtures and call sites that omit it stay
    *  valid. */
   authority_state_at_admission?: AuthorityStateSnapshot
+
+  /** Optional (W2-B1): pointer to the trust-root-policy a producer
+   *  evaluated this receipt's issuer against, of the form
+   *  `${policy_id}@${policy_version}`. It is a REFERENCE, not an
+   *  assurance: a relying party re-derives its own verdict against its
+   *  own policy and never reads acceptance off this field. Optional so
+   *  existing fixtures and call sites that omit it keep byte-identical
+   *  canonical form. */
+  trust_policy_ref?: string
 }
 
 // ── Cycles release-receipt ────────────────────────────────────────
@@ -306,6 +315,10 @@ export interface SignCyclesPermitReceiptInput {
    *  signer is the raw hex pubkey derived from the private key. */
   issuer_agent_id?: string
   issuer_key_ref?: string
+  /** Optional (W2-B1): trust-root-policy reference, carried onto the
+   *  permit-receipt as trust_policy_ref when supplied; absent otherwise
+   *  (canonical bytes unchanged on omit). */
+  trust_policy_ref?: string
 }
 
 export interface SignCyclesReleaseReceiptInput {
