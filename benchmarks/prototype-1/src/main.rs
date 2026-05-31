@@ -21,6 +21,7 @@
 //! Output: JSON written to
 //! `benchmarks/prototype-1/results/mac-apple-silicon/<benchmark>.json`.
 
+mod batch;
 mod env_capture;
 mod stats;
 mod workload;
@@ -110,10 +111,15 @@ fn main() -> ExitCode {
         eprintln!("usage: aps-bench <L0|L1> [--concurrent]");
         return ExitCode::from(2);
     }
+    // L5 (batch FFI-amortization shape) has its own result schema and
+    // batch-size sweep, so it is dispatched before the L0/L1 parser.
+    if args[1] == "L5" || args[1] == "l5" {
+        return run_l5();
+    }
     let bench = match Benchmark::parse(&args[1]) {
         Some(b) => b,
         None => {
-            eprintln!("unknown benchmark: {} (supported: L0, L1)", args[1]);
+            eprintln!("unknown benchmark: {} (supported: L0, L1, L5)", args[1]);
             return ExitCode::from(2);
         }
     };
@@ -572,4 +578,197 @@ fn output_path(env: &EnvironmentSnapshot, bench: Benchmark) -> PathBuf {
     p.push(&env.label);
     p.push(format!("{}.json", bench.label()));
     p
+}
+
+// -----------------------------------------------------------------------
+// L5: batch amortization (sequential vs batched aps_check)
+// -----------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+struct L5Result {
+    benchmark: &'static str,
+    description: &'static str,
+    environment: EnvironmentSnapshot,
+    methodology: L5Methodology,
+    rows: Vec<L5Row>,
+    run: RunMeta,
+    proof_box: L5ProofBox,
+}
+
+#[derive(Debug, Serialize)]
+struct L5Methodology {
+    warmup_repeats: usize,
+    measure_repeats: usize,
+    timer: &'static str,
+    sink: &'static str,
+    crosses_ffi_boundary: bool,
+    notes: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct L5Row {
+    batch_size: usize,
+    measure_repeats: usize,
+    sequential_total_ns: u64,
+    batched_total_ns: u64,
+    sequential_per_action_ns: f64,
+    batched_per_action_ns: f64,
+    /// batched / sequential per-action time. < 1.0 means the batched
+    /// loop is faster per action on this host; ~1.0 means parity.
+    batched_over_sequential: f64,
+    decisions_match: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct L5ProofBox {
+    proves: &'static str,
+    does_not_prove: &'static str,
+}
+
+/// L5 sweep: for each batch size, time `aps_check` evaluated
+/// sequentially vs. in one batched loop, assert the two decision streams
+/// match position-by-position, and record per-action nanoseconds. This
+/// is a verifier-core measurement; it does NOT cross the N-API boundary
+/// and therefore does NOT capture the FFI marshalling cost that
+/// `check_many` amortizes in a JS host. No public latency claim is
+/// approved from this output.
+fn run_l5() -> ExitCode {
+    const WARMUP_REPEATS: usize = 3;
+    const MEASURE_REPEATS: usize = 50;
+
+    let env = env_capture::capture();
+    let mut rows: Vec<L5Row> = Vec::with_capacity(batch::BATCH_SIZES.len());
+
+    for &size in batch::BATCH_SIZES {
+        let fixture = match batch::BatchFixture::build(size) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("L5 fixture build failed (size={size}): {e}");
+                return ExitCode::FAILURE;
+            }
+        };
+
+        // Warmup both paths untimed.
+        for _ in 0..WARMUP_REPEATS {
+            std::hint::black_box(batch::run_sequential(&fixture));
+            std::hint::black_box(batch::run_batched(&fixture));
+        }
+
+        // Parity check: the two paths must agree on every decision.
+        let seq_ref = batch::run_sequential(&fixture);
+        let batch_ref = batch::run_batched(&fixture);
+        let mut decisions_match = seq_ref.len() == batch_ref.len();
+        if decisions_match {
+            for (s, b) in seq_ref.iter().zip(batch_ref.iter()) {
+                if s.decision_type != b.decision_type
+                    || s.reason_code != b.reason_code
+                    || s.sequence_id != b.sequence_id
+                    || s.decision_id != b.decision_id
+                    || s.event_mac != b.event_mac
+                {
+                    decisions_match = false;
+                    break;
+                }
+            }
+        }
+        if !decisions_match {
+            eprintln!("L5 parity FAILED at batch size {size}: batched decisions diverge from sequential");
+            return ExitCode::FAILURE;
+        }
+
+        // Timed: accumulate total wall time across MEASURE_REPEATS.
+        let mut seq_total: u64 = 0;
+        for _ in 0..MEASURE_REPEATS {
+            let t0 = Instant::now();
+            let out = batch::run_sequential(&fixture);
+            seq_total += t0.elapsed().as_nanos() as u64;
+            std::hint::black_box(out);
+        }
+        let mut batch_total: u64 = 0;
+        for _ in 0..MEASURE_REPEATS {
+            let t0 = Instant::now();
+            let out = batch::run_batched(&fixture);
+            batch_total += t0.elapsed().as_nanos() as u64;
+            std::hint::black_box(out);
+        }
+
+        let actions_total = (size * MEASURE_REPEATS) as f64;
+        let seq_per = if actions_total > 0.0 {
+            seq_total as f64 / actions_total
+        } else {
+            0.0
+        };
+        let batch_per = if actions_total > 0.0 {
+            batch_total as f64 / actions_total
+        } else {
+            0.0
+        };
+        let ratio = if seq_per > 0.0 { batch_per / seq_per } else { 0.0 };
+
+        rows.push(L5Row {
+            batch_size: size,
+            measure_repeats: MEASURE_REPEATS,
+            sequential_total_ns: seq_total,
+            batched_total_ns: batch_total,
+            sequential_per_action_ns: seq_per,
+            batched_per_action_ns: batch_per,
+            batched_over_sequential: ratio,
+            decisions_match,
+        });
+    }
+
+    let result = L5Result {
+        benchmark: "L5",
+        description: "batch_amortization_sequential_vs_batched_verifier_core",
+        environment: env.clone(),
+        methodology: L5Methodology {
+            warmup_repeats: WARMUP_REPEATS,
+            measure_repeats: MEASURE_REPEATS,
+            timer: "std::time::Instant",
+            sink: "NullSink (no-op trait dispatch only)",
+            crosses_ffi_boundary: false,
+            notes: "L5 times aps_check evaluated sequentially vs. in one batched loop \
+                over a fixed pre-finalized Allow action slice, sweeping batch size. \
+                Decisions are asserted to match position-by-position before timing. \
+                This is a verifier-core measurement only: it does not cross the N-API \
+                boundary, so it does not capture the FFI marshalling cost that check_many \
+                amortizes in a JS host. Linux x86_64 numbers require a Linux runner and \
+                are environment-gated; this run reflects only the host in environment.label.",
+        },
+        rows,
+        run: capture_run_meta(),
+        proof_box: L5ProofBox {
+            proves: "Each action in a batched evaluation is checked under the same policy \
+                as a single check: every element runs the identical aps_check code path \
+                against the same compiled authority and verifier context, in input order, \
+                so the batched decision stream is byte-equal to the sequential one.",
+            does_not_prove: "Nothing about wall-clock latency on any platform other than \
+                the host where this run was measured. No public latency claim is approved \
+                from this output; result JSON is internal pending CLAIMS.md review.",
+        },
+    };
+
+    let mut out_path = PathBuf::from("benchmarks/prototype-1/results");
+    out_path.push(&env.label);
+    out_path.push("L5.json");
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent).expect("create_dir_all");
+    }
+    let json = serde_json::to_string_pretty(&result).expect("serialize");
+    fs::write(&out_path, json).expect("write");
+    eprintln!("wrote {}", out_path.display());
+
+    println!("L5 batch amortization ({})", env.label);
+    println!(
+        "{:>10} | {:>16} | {:>14} | {:>14}",
+        "batch", "seq ns/action", "batch ns/act", "batch/seq"
+    );
+    println!("{:->10}-+-{:->16}-+-{:->14}-+-{:->14}", "", "", "", "");
+    for r in &result.rows {
+        println!(
+            "{:>10} | {:>16.2} | {:>14.2} | {:>13.3}x",
+            r.batch_size, r.sequential_per_action_ns, r.batched_per_action_ns, r.batched_over_sequential
+        );
+    }
+    ExitCode::SUCCESS
 }

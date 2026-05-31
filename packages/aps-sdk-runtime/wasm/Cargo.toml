@@ -1,0 +1,31 @@
+# Isolated WASM build path for the APS runtime verifier.
+#
+# This crate is its OWN workspace root (note the empty [workspace] table
+# below) so it is not pulled into the repo's root cargo workspace. That
+# keeps its wasm-bindgen dependency contained to this sub-package, per the
+# "new runtime deps only inside an isolated sub-package" rule. Building it
+# never touches the napi crate, the root workspace, or any other member.
+#
+# Target: wasm32-unknown-unknown. Build with `scripts/build-wasm.sh`.
+
+[workspace]
+
+[package]
+name = "aps-sdk-runtime-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "WASM build path for the APS Runtime Passport verifier (batched check_many surface)"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aps-verifier-core = { path = "../../../crates/aps-verifier-core" }
+wasm-bindgen = "0.2"
+blake3 = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true

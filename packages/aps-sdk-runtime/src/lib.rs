@@ -481,14 +481,101 @@ pub fn check(
     let decision = aps_check(&handle.authority, &descriptor, &ctx);
     drop(guard);
 
-    Ok(DecisionOutput {
+    Ok(decision_output(&decision))
+}
+
+/// Batched form of [`check`]. Evaluates `actions` in order against the
+/// same authority and returns one [`DecisionOutput`] per action, in the
+/// same order. Amortizes the per-call FFI cost: the action vector is
+/// marshalled across the N-API boundary once, the sink mutex is locked
+/// once, and the [`VerifierContext`] is constructed once for the whole
+/// batch instead of once per element.
+///
+/// Semantics are identical to calling [`check`] N times in sequence.
+/// Each element runs the same [`aps_check`] code path, so the i-th
+/// element of the result equals the decision a single `check` would
+/// return for `actions[i]` issued at that point in the sequence. Per
+/// spec §9 the verifier mutates shared session state (sequence CAS,
+/// budget decrement, decision-id counter) on each call, so order is
+/// significant and each action is evaluated independently against the
+/// state left by its predecessors in the batch.
+///
+/// An empty `actions` vector returns an empty result vector without
+/// touching the authority. There is no cross-action short-circuit: a
+/// deny at position i does not skip evaluation of position i+1.
+#[napi]
+pub fn check_many(
+    handle: External<AuthorityHandle>,
+    actions: Vec<ActionInput>,
+) -> napi::Result<Vec<DecisionOutput>> {
+    // Marshal every descriptor before locking so a malformed input
+    // fails the whole call without leaving the sink lock held.
+    let mut descriptors = Vec::with_capacity(actions.len());
+    for action in &actions {
+        descriptors.push(build_action_descriptor(action)?);
+    }
+
+    let guard = handle
+        .sink
+        .lock()
+        .map_err(|e| napi::Error::from_reason(format!("sink mutex poisoned: {e}")))?;
+    let sink_variant = guard
+        .as_ref()
+        .ok_or_else(|| napi::Error::from_reason("authority has been shut down".to_string()))?;
+    let sink_ref: &dyn ReceiptSink = sink_variant.as_sink();
+    let ctx = VerifierContext::with_sink(
+        &handle.clock,
+        handle.verifier_instance_id_hash,
+        handle.attested_tier,
+        handle.revocation_epoch,
+        sink_ref,
+    );
+
+    let decisions = check_many_core(&handle.authority, &descriptors, &ctx);
+    drop(guard);
+
+    Ok(decisions.iter().map(decision_output).collect())
+}
+
+/// Pure-Rust batch evaluation loop shared by [`check_many`]. Evaluates
+/// each descriptor in order via [`aps_check`] against the same
+/// authority and context, collecting one [`aps_verifier_core::Decision`]
+/// per input in input order. Holds no N-API types so it is unit
+/// testable without a JS runtime; [`check_many`] is the thin marshalling
+/// wrapper around it.
+///
+/// This is intentionally a plain sequential loop: the amortization
+/// [`check_many`] delivers is at the FFI boundary (one marshalled
+/// vector, one mutex acquisition, one context build), not in the
+/// verifier evaluation itself. Per spec §9 each `aps_check` mutates
+/// shared session state, so calling this once with N descriptors must
+/// produce byte-identical decisions to N separate `aps_check` calls in
+/// the same order against the same authority.
+fn check_many_core(
+    authority: &CompiledAuthority,
+    descriptors: &[ActionDescriptor],
+    ctx: &VerifierContext,
+) -> Vec<aps_verifier_core::Decision> {
+    let mut decisions = Vec::with_capacity(descriptors.len());
+    for descriptor in descriptors {
+        decisions.push(aps_check(authority, descriptor, ctx));
+    }
+    decisions
+}
+
+/// Convert a core [`aps_verifier_core::Decision`] into the N-API
+/// [`DecisionOutput`] wire shape. Shared by [`check`] and
+/// [`check_many`] so a single-call and a batched-call decision for the
+/// same action serialize identically.
+fn decision_output(decision: &aps_verifier_core::Decision) -> DecisionOutput {
+    DecisionOutput {
         decision_type: decision_type_name(decision.decision_type).to_string(),
         reason_code: decision.reason_code as u8,
         reason_name: reason_code_name(decision.reason_code).to_string(),
         sequence_id: BigInt::from(decision.sequence_id),
         decision_id_hex: hex_encode_slice(&decision.decision_id),
         event_mac_hex: hex_encode_slice(&decision.event_mac),
-    })
+    }
 }
 
 /// Release the handle without draining. The sink continues running in
@@ -898,4 +985,356 @@ fn shell_string(cmd: &str, args: &[&str]) -> String {
             }
         })
         .unwrap_or_else(|| "unknown".into())
+}
+
+// -----------------------------------------------------------------------
+// check_many marshalling / batch-semantics tests
+// -----------------------------------------------------------------------
+//
+// These exercise the pure-Rust batch loop [`check_many_core`] that
+// [`check_many`] wraps. The N-API surface (`External`, `BigInt`) needs a
+// JS runtime to construct, so the runtime parity is also covered by the
+// TS test `tests/check-many-parity.test.ts`; this module validates the
+// batch evaluation logic directly against `aps_verifier_core` so it runs
+// under plain `cargo test`, with no `.node` artifact required.
+//
+// Proof box (also in tests/check-many-parity.test.ts):
+//   Proves: a check_many result shows each action was evaluated under
+//   the same policy as a single check. Every element runs the identical
+//   aps_check code path against the same compiled authority and verifier
+//   context, in input order, so the i-th batched decision is byte-equal
+//   to the i-th sequential decision.
+//   Does NOT prove: anything about wall-clock latency on any platform
+//   other than the host where a measurement was actually taken.
+#[cfg(test)]
+mod check_many_tests {
+    use super::*;
+    use aps_verifier_core::{
+        hash_path_component, CompiledAuthority, Decision, ManualClock, NullSink, RuntimePassport,
+        Tier, ToolEntry, ToolRegistry,
+    };
+
+    const TOOL_HEX: &str = "abcd000000000000000000000000000000000000000000000000000000000000";
+    const SEQ_START: u64 = 1000;
+    // Midway through the 60s validity window of the fixture passport.
+    const CLOCK_NS: u64 = 1_779_230_341_000_000_000;
+
+    struct Harness {
+        authority: CompiledAuthority,
+        clock: ManualClock,
+        instance_id_hash: [u8; 32],
+        revocation_epoch: u32,
+        sink: NullSink,
+    }
+
+    impl Harness {
+        fn build() -> Self {
+            let tool_hash = hex_to_array::<32>(TOOL_HEX).expect("tool hex");
+            let registry = ToolRegistry::from_entries(vec![ToolEntry {
+                descriptor_hash: tool_hash,
+                local_id: 0,
+            }])
+            .expect("registry");
+            let root_hex = hex_encode_slice(&registry.current_root());
+            let json = passport_json(&root_hex, TOOL_HEX);
+            let passport = RuntimePassport::from_json(&json).expect("passport parse");
+            let authority =
+                CompiledAuthority::from_passport(&passport, registry).expect("compile");
+            Harness {
+                authority,
+                clock: ManualClock::new(CLOCK_NS),
+                instance_id_hash: blake3_32("vi_01HX0VI00000000000000000000"),
+                revocation_epoch: 1842,
+                sink: NullSink,
+            }
+        }
+
+        fn context(&self) -> VerifierContext<'_> {
+            VerifierContext::with_sink(
+                &self.clock,
+                self.instance_id_hash,
+                Tier::T2,
+                self.revocation_epoch,
+                &self.sink,
+            )
+        }
+
+        fn reset_sequence(&self) {
+            self.authority
+                .sequence_next
+                .store(SEQ_START, std::sync::atomic::Ordering::Release);
+        }
+    }
+
+    fn blake3_32(s: &str) -> [u8; 32] {
+        *blake3::hash(s.as_bytes()).as_bytes()
+    }
+
+    fn blank() -> ActionDescriptor {
+        ActionDescriptor {
+            version: 1,
+            reserved: [0; 3],
+            passport_id_hash: [0; 32],
+            tool_descriptor_hash: [0; 32],
+            local_tool_id: 0,
+            operation_id: 0,
+            resource_type: 0,
+            risk_class: 0,
+            resource_path_depth: 0,
+            reserved2: [0; 2],
+            cost_units: 0,
+            sequence_id: 0,
+            nonce: [0; 16],
+            resource_path_hashes: [0; 8],
+            action_hash: [0; 32],
+        }
+    }
+
+    /// An action that the fixture passport will Allow at `sequence_id`.
+    fn allow_action(seq: u64) -> ActionDescriptor {
+        let tool_hash = hex_to_array::<32>(TOOL_HEX).expect("tool hex");
+        let mut a = blank();
+        a.passport_id_hash = blake3_32("rp_01HX0EXAMPLE000000000000000");
+        a.tool_descriptor_hash = tool_hash;
+        a.local_tool_id = 0;
+        a.operation_id = 0;
+        a.risk_class = 2;
+        a.resource_path_depth = 1;
+        a.resource_path_hashes[0] = hash_path_component("customer");
+        a.cost_units = 1;
+        a.nonce = [0x55; 16];
+        a.sequence_id = seq;
+        a.finalize();
+        a
+    }
+
+    /// An action whose operation is not in the passport's allowed mask:
+    /// the verifier denies with OPERATION_NOT_ALLOWED. The deny path
+    /// short-circuits before the sequence CAS, so it does not consume a
+    /// sequence slot and other elements in the batch are unaffected.
+    fn deny_action(seq: u64) -> ActionDescriptor {
+        let mut a = allow_action(seq);
+        a.operation_id = 1; // passport only allows "read" (op 0)
+        a.finalize();
+        a
+    }
+
+    fn passport_json(root_hex: &str, tool_hex: &str) -> String {
+        format!(
+            r#"{{
+  "type": "aps.runtime_passport",
+  "version": "0.1",
+  "passport_id": "rp_01HX0EXAMPLE000000000000000",
+  "agent_id": "ag_01HX0AGENT000000000000000000",
+  "principal_id": "pr_01HX0PRINCIPAL00000000000000",
+  "beneficiary_id": "bn_01HX0BEN00000000000000000000",
+  "issuer": "https://gateway.example.test",
+  "issued_at": "2026-05-19T22:38:56.000Z",
+  "expires_at": "2026-05-19T22:39:56.000Z",
+  "max_clock_skew_ms": 1000,
+  "policy_epoch": 42,
+  "revocation_epoch": 1842,
+  "tool_registry_root": "blake3:{root_hex}",
+  "delegation_chain_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "effective_authority_hash": "blake3:0000000000000000000000000000000000000000000000000000000000000000",
+  "risk_class": "R2",
+  "minimum_tier_required": "T2",
+  "tier_attested": "T2",
+  "verifier_instance_id": "vi_01HX0VI00000000000000000000",
+  "verifier_build_hash": "blake3:1111111111111111111111111111111111111111111111111111111111111111",
+  "session_id": "sn_01HX0SESS00000000000000000000",
+  "sequence_start": 1000,
+  "sequence_end": 100000001,
+  "budget_lease": {{
+    "lease_id": "bl_01HX0LEASE0000000000000000000",
+    "max_actions": 4294967295,
+    "max_cost_units": 18446744073709551615,
+    "sublease_parent": null
+  }},
+  "authority_blob_encoding": "application/aps-authority+json",
+  "authority_blob": {{
+    "allowed_tools": ["blake3:{tool_hex}"],
+    "allowed_operations": ["read"],
+    "resource_scopes": ["customer/*"],
+    "approval_rules": []
+  }},
+  "receipt_stream_id": "rs_01HX0RS00000000000000000000",
+  "signature": "ed25519:{sig}"
+}}"#,
+            sig = "0".repeat(128)
+        )
+    }
+
+    /// Two decisions are observationally identical when every field a
+    /// caller can read matches. `event_mac` and `decision_id` are
+    /// included: the MAC binds passport, action, and a monotonic
+    /// decision-id counter, so identical decisions require the batch
+    /// loop to advance that counter in lockstep with sequential calls.
+    fn assert_same(a: &Decision, b: &Decision) {
+        assert_eq!(a.decision_type, b.decision_type, "decision_type");
+        assert_eq!(a.reason_code, b.reason_code, "reason_code");
+        assert_eq!(a.sequence_id, b.sequence_id, "sequence_id");
+        assert_eq!(a.decision_id, b.decision_id, "decision_id");
+        assert_eq!(a.event_mac, b.event_mac, "event_mac");
+    }
+
+    /// Run `descriptors` one at a time through `aps_check` (the
+    /// sequential reference path a host gets from N `check` calls).
+    fn sequential(h: &Harness, descriptors: &[ActionDescriptor]) -> Vec<Decision> {
+        let ctx = h.context();
+        descriptors
+            .iter()
+            .map(|d| aps_check(&h.authority, d, &ctx))
+            .collect()
+    }
+
+    /// Run `descriptors` through the batched loop `check_many` wraps.
+    fn batched(h: &Harness, descriptors: &[ActionDescriptor]) -> Vec<Decision> {
+        let ctx = h.context();
+        check_many_core(&h.authority, descriptors, &ctx)
+    }
+
+    #[test]
+    fn empty_batch_returns_empty() {
+        let h = Harness::build();
+        let out = batched(&h, &[]);
+        assert!(out.is_empty(), "empty input must yield empty output");
+    }
+
+    #[test]
+    fn single_element_batch_matches_single_check() {
+        let seq = SEQ_START;
+
+        let h_seq = Harness::build();
+        let seq_out = sequential(&h_seq, &[allow_action(seq)]);
+
+        let h_batch = Harness::build();
+        let batch_out = batched(&h_batch, &[allow_action(seq)]);
+
+        assert_eq!(seq_out.len(), 1);
+        assert_eq!(batch_out.len(), 1);
+        assert_eq!(seq_out[0].decision_type, DecisionType::Allow);
+        assert_same(&seq_out[0], &batch_out[0]);
+    }
+
+    #[test]
+    fn all_allow_batch_matches_sequential() {
+        // Five consecutive Allow actions: each advances the sequence
+        // floor, so parity requires the batch loop to walk the same
+        // sequence ladder a sequential caller would.
+        let descriptors: Vec<ActionDescriptor> =
+            (0..5).map(|i| allow_action(SEQ_START + i)).collect();
+
+        let h_seq = Harness::build();
+        let seq_out = sequential(&h_seq, &descriptors);
+
+        let h_batch = Harness::build();
+        let batch_out = batched(&h_batch, &descriptors);
+
+        assert_eq!(seq_out.len(), batch_out.len());
+        for (i, (s, b)) in seq_out.iter().zip(batch_out.iter()).enumerate() {
+            assert_eq!(s.decision_type, DecisionType::Allow, "seq idx {i}");
+            assert_same(s, b);
+        }
+    }
+
+    #[test]
+    fn mixed_allow_deny_batch_each_independent() {
+        // Position 1 denies (OPERATION_NOT_ALLOWED) and short-circuits
+        // before the sequence CAS, so it consumes no sequence slot. The
+        // surrounding Allow actions take SEQ_START, SEQ_START+1,
+        // SEQ_START+2 in order. Parity must hold element-by-element.
+        let descriptors = vec![
+            allow_action(SEQ_START),     // Allow, advances to 1001
+            deny_action(SEQ_START + 1),  // Deny, no sequence consumed
+            allow_action(SEQ_START + 1), // Allow, advances to 1002
+            allow_action(SEQ_START + 2), // Allow, advances to 1003
+        ];
+
+        let h_seq = Harness::build();
+        let seq_out = sequential(&h_seq, &descriptors);
+
+        let h_batch = Harness::build();
+        let batch_out = batched(&h_batch, &descriptors);
+
+        assert_eq!(seq_out.len(), 4);
+        assert_eq!(seq_out[0].decision_type, DecisionType::Allow);
+        assert_eq!(seq_out[1].decision_type, DecisionType::Deny);
+        assert_eq!(seq_out[1].reason_code, ReasonCode::OperationNotAllowed);
+        assert_eq!(seq_out[2].decision_type, DecisionType::Allow);
+        assert_eq!(seq_out[3].decision_type, DecisionType::Allow);
+
+        for (i, (s, b)) in seq_out.iter().zip(batch_out.iter()).enumerate() {
+            assert_same(s, b);
+            assert_eq!(
+                s.decision_type, b.decision_type,
+                "decision_type at idx {i} diverged"
+            );
+        }
+    }
+
+    #[test]
+    fn leading_deny_does_not_skip_following_allows() {
+        // Negative-path fixture: a deny at position 0 must NOT
+        // short-circuit the batch. Every later Allow still evaluates.
+        let descriptors = vec![
+            deny_action(SEQ_START),      // Deny first
+            allow_action(SEQ_START),     // still Allow
+            allow_action(SEQ_START + 1), // still Allow
+        ];
+        let h = Harness::build();
+        let out = batched(&h, &descriptors);
+        assert_eq!(out.len(), 3);
+        assert_eq!(out[0].decision_type, DecisionType::Deny);
+        assert_eq!(out[1].decision_type, DecisionType::Allow);
+        assert_eq!(out[2].decision_type, DecisionType::Allow);
+    }
+
+    #[test]
+    fn batch_not_slower_than_sequential() {
+        // Perf-shape assertion at the verifier-core level: the batched
+        // loop performs exactly the same per-element work as N
+        // sequential calls plus a single shared setup, so its wall time
+        // must not exceed the sequential path by more than measurement
+        // noise. This is a coarse guard, not a published latency claim:
+        // it only compares two code paths on THIS host. We use a 3x
+        // slack ceiling so the test is not flaky under a loaded CI box,
+        // while still catching an accidental per-element regression
+        // (e.g. rebuilding the context or re-locking inside the loop).
+        const N: u64 = 20_000;
+        let descriptors: Vec<ActionDescriptor> =
+            (0..N).map(|i| allow_action(SEQ_START + i)).collect();
+
+        // Warm both paths once (untimed) to amortize first-touch costs.
+        {
+            let h = Harness::build();
+            h.reset_sequence();
+            let _ = sequential(&h, &descriptors);
+            let h2 = Harness::build();
+            let _ = batched(&h2, &descriptors);
+        }
+
+        let h_seq = Harness::build();
+        let t0 = std::time::Instant::now();
+        let seq_out = sequential(&h_seq, &descriptors);
+        let seq_ns = t0.elapsed().as_nanos();
+        std::hint::black_box(&seq_out);
+
+        let h_batch = Harness::build();
+        let t1 = std::time::Instant::now();
+        let batch_out = batched(&h_batch, &descriptors);
+        let batch_ns = t1.elapsed().as_nanos();
+        std::hint::black_box(&batch_out);
+
+        // Decisions must still match position-by-position.
+        for (s, b) in seq_out.iter().zip(batch_out.iter()) {
+            assert_same(s, b);
+        }
+
+        // batch must not be meaningfully slower than sequential.
+        assert!(
+            batch_ns <= seq_ns.saturating_mul(3).max(1),
+            "batched path unexpectedly slower: batch={batch_ns}ns seq={seq_ns}ns"
+        );
+    }
 }

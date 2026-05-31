@@ -1,0 +1,86 @@
+{
+  "benchmark": "L5",
+  "description": "batch_amortization_sequential_vs_batched_verifier_core",
+  "environment": {
+    "label": "mac-apple-silicon",
+    "spec_section": "13.3",
+    "canonical": false,
+    "host": {
+      "cpu_brand": "Apple M3",
+      "cpu_arch": "arm64",
+      "os_name": "macOS",
+      "os_version": "26.5",
+      "hostname": "Tima-MacBook-Air.local",
+      "memory_bytes": 17179869184
+    }
+  },
+  "methodology": {
+    "warmup_repeats": 3,
+    "measure_repeats": 50,
+    "timer": "std::time::Instant",
+    "sink": "NullSink (no-op trait dispatch only)",
+    "crosses_ffi_boundary": false,
+    "notes": "L5 times aps_check evaluated sequentially vs. in one batched loop over a fixed pre-finalized Allow action slice, sweeping batch size. Decisions are asserted to match position-by-position before timing. This is a verifier-core measurement only: it does not cross the N-API boundary, so it does not capture the FFI marshalling cost that check_many amortizes in a JS host. Linux x86_64 numbers require a Linux runner and are environment-gated; this run reflects only the host in environment.label."
+  },
+  "rows": [
+    {
+      "batch_size": 1,
+      "measure_repeats": 50,
+      "sequential_total_ns": 24664,
+      "batched_total_ns": 21041,
+      "sequential_per_action_ns": 493.28,
+      "batched_per_action_ns": 420.82,
+      "batched_over_sequential": 0.8531057411612066,
+      "decisions_match": true
+    },
+    {
+      "batch_size": 8,
+      "measure_repeats": 50,
+      "sequential_total_ns": 164915,
+      "batched_total_ns": 163874,
+      "sequential_per_action_ns": 412.2875,
+      "batched_per_action_ns": 409.685,
+      "batched_over_sequential": 0.9936876572779917,
+      "decisions_match": true
+    },
+    {
+      "batch_size": 64,
+      "measure_repeats": 50,
+      "sequential_total_ns": 1293494,
+      "batched_total_ns": 1293714,
+      "sequential_per_action_ns": 404.216875,
+      "batched_per_action_ns": 404.285625,
+      "batched_over_sequential": 1.0001700819640447,
+      "decisions_match": true
+    },
+    {
+      "batch_size": 512,
+      "measure_repeats": 50,
+      "sequential_total_ns": 9542039,
+      "batched_total_ns": 8915292,
+      "sequential_per_action_ns": 372.7358984375,
+      "batched_per_action_ns": 348.25359375,
+      "batched_over_sequential": 0.93431728795072,
+      "decisions_match": true
+    },
+    {
+      "batch_size": 4096,
+      "measure_repeats": 50,
+      "sequential_total_ns": 62186248,
+      "batched_total_ns": 62193455,
+      "sequential_per_action_ns": 303.6437890625,
+      "batched_per_action_ns": 303.6789794921875,
+      "batched_over_sequential": 1.0001158937905372,
+      "decisions_match": true
+    }
+  ],
+  "run": {
+    "git_commit": "2bd97b1146525f720f3deda046477a81caeb62a8",
+    "git_branch": "feat/m2-batched-check-and-bench",
+    "timestamp_unix_ns": 1780262695304305000
+  },
+  "proof_box": {
+    "proves": "Each action in a batched evaluation is checked under the same policy as a single check: every element runs the identical aps_check code path against the same compiled authority and verifier context, in input order, so the batched decision stream is byte-equal to the sequential one.",
+    "does_not_prove": "Nothing about wall-clock latency on any platform other than the host where this run was measured. No public latency claim is approved from this output; result JSON is internal pending CLAIMS.md review."
+  }
+}
