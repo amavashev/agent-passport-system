@@ -151,7 +151,41 @@ export interface PolicyReceipt {
    *  v2.3 emitters populate this; v2.3 verifiers prefer it when present; v2.2.x
    *  consumers ignore it silently. Optional for back-compat. */
   epistemic_claims?: EpistemicClaims
+  /** Optional pointer to an external soundness proof for this receipt's decision.
+   *  Names the proof artifact by content hash. This field is deliberately format
+   *  agnostic: it commits to no cross-system proof object schema, which is tracked
+   *  separately (A2A#1463). Presence asserts only that the receipt points at the
+   *  named artifact. It does NOT assert that the referenced proof is valid, sound,
+   *  or even retrievable. A verifier that trusts a proof_ref must fetch and check
+   *  the artifact out of band. Optional and absent by default for back-compat.
+   *  See {@link ProofRef} in ../v2/feasibility/proof-ref.js. */
+  proof_ref?: ProofRef
   signature: string         // signed by the verifier
+}
+
+/** Algorithm used to content-address an external proof artifact. */
+export type ProofRefHashAlgorithm = 'sha256'
+
+/** Names an external soundness proof by content hash, without committing to the
+ *  proof's internal format. See the proof box in ../v2/feasibility/proof-ref.ts.
+ *
+ *  Proves: a receipt points at the artifact whose bytes hash to {@link ProofRef.hash}.
+ *  Does not prove: that the artifact is a valid or sound proof, or that it is
+ *  retrievable. Validation of the referenced proof is out of band and out of scope
+ *  for this round. */
+export interface ProofRef {
+  /** Hash algorithm. Only 'sha256' is specified this round. */
+  algorithm: ProofRefHashAlgorithm
+  /** Lowercase hex content hash of the external proof artifact's bytes. */
+  hash: string
+  /** Free-form identifier for the proof system or convention that produced the
+   *  artifact (e.g. 'smtlib2', 'lean4', 'coq'). Advisory only. No schema is
+   *  committed here; cross-system proof format is tracked at A2A#1463. */
+  proofSystem?: string
+  /** Optional advisory URI hint for where the artifact may be fetched. The
+   *  reference is the hash, not the locator. A verifier MUST re-hash fetched
+   *  bytes and compare against {@link ProofRef.hash}. */
+  locator?: string
 }
 
 // ── Validator Interface ──
