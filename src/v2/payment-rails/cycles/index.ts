@@ -82,6 +82,14 @@ import type {
   SignCyclesReleaseReceiptInput,
   VerifyCyclesOptions,
 } from './types.js'
+import {
+  resolveEvidenceRef,
+  toEvidenceDescriptorInput,
+} from './evidence-resolution.js'
+import type {
+  EvidenceDescriptorInput,
+  EvidenceResolutionResult,
+} from './evidence-resolution.js'
 
 // ── Internal helpers ──────────────────────────────────────────────
 
@@ -513,5 +521,96 @@ async function _verifyReceiptWithDID(
   return { valid: true }
 }
 
+// ── External-evidence resolution: claimed vs resolved (W2-A2) ─────
+// The sync/_WithDID paths above signature-check the receipt, which
+// covers the CLAIMED cycles_evidence_id_sha256 but never fetches the
+// envelope at cycles_evidence_url. These *WithEvidence paths COMPLETE
+// the join-integrity check the file header flagged as a TODO: they run
+// the full receipt verification first, then (when a caller-supplied
+// resolver is present) fetch the envelope and recompute its content
+// hash to test the claimed value. Egress lives entirely in the
+// caller's resolver; the SDK reaches no global fetch.
+
+/**
+ * Combined verify + evidence-resolution result. `verify` is the existing
+ * receipt verdict (signature, ttl, accountability shape - unchanged).
+ * `evidence` is the claimed-vs-resolved verdict for the CyclesEvidence
+ * envelope. `descriptor` is the mechanical input the W2-A1 verifier
+ * descriptor consumes for the external-evidence axis.
+ *
+ * A green `verify` with a `signature_only` `descriptor.observation_basis`
+ * is the explicit "claims an envelope at hash H, signature-checked only"
+ * state. `counterparty_resolved` is "envelope at H fetched and matched".
+ */
+export interface CyclesVerifyWithEvidenceResult {
+  verify: CyclesVerifyResult
+  evidence: EvidenceResolutionResult
+  descriptor: EvidenceDescriptorInput
+}
+
+async function _verifyWithEvidence(
+  obj: AnyCyclesSigned,
+  expectedClaimType:
+    | typeof RAIL_BUDGET_RESERVATION_PERMIT_CLAIM_TYPE
+    | typeof RAIL_BUDGET_RESERVATION_RELEASE_CLAIM_TYPE
+    | typeof RAIL_BUDGET_RESERVATION_DENIAL_CLAIM_TYPE,
+  options: VerifyCyclesOptions,
+): Promise<CyclesVerifyWithEvidenceResult> {
+  // Run the full receipt verification (DID-aware) first.
+  const verify = await _verifyReceiptWithDID(obj, expectedClaimType, options)
+  // Resolve the evidence ref regardless of the receipt verdict, so the
+  // descriptor always reports the claimed-vs-resolved basis. Resolution
+  // records failure, never throws.
+  const evidence = await resolveEvidenceRef(
+    obj.cycles_evidence,
+    options.resolveEvidence,
+    { failurePolicy: options.evidenceFailurePolicy },
+  )
+  return {
+    verify,
+    evidence,
+    descriptor: toEvidenceDescriptorInput(evidence),
+  }
+}
+
+export async function verifyCyclesPermitReceiptWithEvidence(
+  receipt: CyclesPermitReceipt,
+  options: VerifyCyclesOptions = {},
+): Promise<CyclesVerifyWithEvidenceResult> {
+  return _verifyWithEvidence(receipt, RAIL_BUDGET_RESERVATION_PERMIT_CLAIM_TYPE, options)
+}
+
+export async function verifyCyclesReleaseReceiptWithEvidence(
+  receipt: CyclesReleaseReceipt,
+  options: VerifyCyclesOptions = {},
+): Promise<CyclesVerifyWithEvidenceResult> {
+  return _verifyWithEvidence(receipt, RAIL_BUDGET_RESERVATION_RELEASE_CLAIM_TYPE, options)
+}
+
+export async function verifyCyclesDenialWithEvidence(
+  denial: CyclesDenial,
+  options: VerifyCyclesOptions = {},
+): Promise<CyclesVerifyWithEvidenceResult> {
+  return _verifyWithEvidence(denial, RAIL_BUDGET_RESERVATION_DENIAL_CLAIM_TYPE, options)
+}
+
 /** Re-export the resolver type for callers wiring the async paths. */
 export type { CyclesResolveDidDocument } from './types.js'
+
+// ── External-evidence resolution surface (W2-A2) ──────────────────
+export {
+  resolveEvidenceRef,
+  recomputeEvidenceContentHash,
+  toEvidenceDescriptorInput,
+} from './evidence-resolution.js'
+export type {
+  EvidenceResolver,
+  EvidenceFetchResult,
+  EvidenceResolutionResult,
+  EvidenceResolutionStatus,
+  EvidenceFailurePolicy,
+  ResolveEvidenceConfig,
+  FetchedCyclesEvidenceEnvelope,
+  EvidenceDescriptorInput,
+  EvidenceObservationBasis,
+} from './evidence-resolution.js'

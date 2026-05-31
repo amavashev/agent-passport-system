@@ -346,6 +346,19 @@ export interface VerifyCyclesOptions {
   /** Required when signer is a DID URI. Sync verify paths return
    *  DID_RESOLVER_MISSING; pass this to the *WithDID async paths. */
   resolveDidDocument?: CyclesResolveDidDocument
+  /** Optional (W2-A2): a caller-supplied resolver for the CyclesEvidence
+   *  envelope at cycles_evidence_url. When supplied to the *WithEvidence
+   *  async paths, the verifier fetches the envelope and recomputes its
+   *  content hash to test the CLAIMED cycles_evidence_id_sha256. When
+   *  omitted, the claimed hash is signature-checked only (claimed, not
+   *  resolved). The SDK performs no network egress itself: the resolver
+   *  owns the transport. Mirrors the resolveDidDocument seam. */
+  resolveEvidence?: import('./evidence-resolution.js').EvidenceResolver
+  /** Optional (W2-A2): failure posture for envelope resolution. Default
+   *  'closed'. fail-open relaxes ONLY an unreachable endpoint to a
+   *  degraded, still non-matching outcome; it never makes an unmatched
+   *  envelope read as resolved. */
+  evidenceFailurePolicy?: import('./evidence-resolution.js').EvidenceFailurePolicy
 }
 
 /** DID document resolver — mirrors MppResolveDidDocument. */
