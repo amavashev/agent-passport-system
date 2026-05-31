@@ -7,6 +7,7 @@
 
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { canonicalize } from '../src/core/canonical.js'
 import {
   canonicalizeJCS, detectCanonicalVariant, getTestVectors,
@@ -100,6 +101,127 @@ describe('JCS — Cross-Language Test Vectors', () => {
       assert.strictEqual(legacyHash, v.sha256_legacy, `Legacy hash mismatch for ${v.id}`)
     })
   }
+})
+
+describe('JCS Nested-Attestation Path Vectors (W2-A3)', () => {
+  // The cv-011..cv-015 vectors live in the canonicalization spec JSON, not
+  // in the frozen getTestVectors() helper (src/core/canonical-jcs.ts must
+  // stay byte-identical to main). Load them from the spec at test time.
+  // The test working directory is the repo root.
+  interface SpecVector {
+    id: string
+    description: string
+    input: unknown
+    expected_jcs: string
+    expected_legacy: string
+    sha256_jcs: string
+    sha256_legacy: string
+  }
+  const specVectors = JSON.parse(
+    readFileSync('specs/test-vectors-canonicalization.json', 'utf-8'),
+  ) as SpecVector[]
+  const vectors = specVectors.filter(
+    v => ['cv-011', 'cv-012', 'cv-013', 'cv-014', 'cv-015'].includes(v.id),
+  )
+  const byId = (id: string) => {
+    const v = vectors.find(x => x.id === id)
+    assert.ok(v, `vector ${id} must exist`)
+    return v!
+  }
+
+  // ── Positive: every nested-attestation vector round-trips byte-identically ──
+  for (const id of ['cv-011', 'cv-012', 'cv-013', 'cv-014', 'cv-015']) {
+    it(`${id}: round-trips byte-identically through canonicalizeJCS`, () => {
+      const v = byId(id)
+      assert.strictEqual(canonicalizeJCS(v.input), v.expected_jcs)
+      // Hash pin: the SHA-256 of the canonical bytes is fixed by the vector.
+      assert.strictEqual(sha256(canonicalizeJCS(v.input)), v.sha256_jcs)
+    })
+  }
+
+  it('cv-012/cv-013/cv-014: null-at-depth forks JCS (preserves) from legacy (strips)', () => {
+    // These three carry a null inside a nested object: JCS keeps it,
+    // legacy strips it. The whole point of pinning the divergence.
+    for (const id of ['cv-012', 'cv-013', 'cv-014']) {
+      const v = byId(id)
+      assert.notStrictEqual(
+        canonicalizeJCS(v.input), canonicalize(v.input),
+        `${id} JCS and legacy must diverge (null at depth)`,
+      )
+      assert.strictEqual(canonicalize(v.input), v.expected_legacy)
+      assert.notStrictEqual(v.sha256_jcs, v.sha256_legacy)
+    }
+  })
+
+  it('cv-011/cv-015: all-present / absent-key forms agree across JCS and legacy', () => {
+    // No null anywhere (predictionError / delegation_expires_at are simply
+    // ABSENT, not null), so JCS and legacy produce identical bytes.
+    for (const id of ['cv-011', 'cv-015']) {
+      const v = byId(id)
+      assert.strictEqual(canonicalizeJCS(v.input), canonicalize(v.input))
+      assert.strictEqual(v.sha256_jcs, v.sha256_legacy)
+    }
+  })
+
+  // ── Negative: present-as-null where the field should be OMITTED ──
+  // This is the exact silent fork the vectors guard against. An optional
+  // nested field that one implementation omits and another writes as
+  // explicit null must NOT canonicalize to the same bytes under JCS.
+  it('NEGATIVE: predictionError present-as-null does NOT match the absent (omitted) form', () => {
+    const absent = byId('cv-011').input // predictionError omitted entirely
+    // Mis-canonicalized variant: the optional nested field written as null.
+    const presentAsNull = {
+      witnessAttestation: {
+        attestation: { constraintsVerified: true, executionObserved: true, receiptConsistent: true },
+        attestedAt: '2026-05-01T00:00:00Z',
+        observationBasis: 'direct_observation',
+        predictionError: null, // WRONG: should be omitted, not null
+        receiptHash: 'sha256:abc',
+        receiptId: 'rcpt-001',
+        signature: 'sig-w1',
+        witnessId: 'wit-001',
+        witnessRole: 'notary',
+      },
+    }
+    const absentBytes = canonicalizeJCS(absent)
+    const nullBytes = canonicalizeJCS(presentAsNull)
+    assert.notStrictEqual(
+      nullBytes, absentBytes,
+      'present-as-null must fork from omitted under JCS; this is the divergence the vectors pin',
+    )
+    // And the omitted form must equal the pinned cv-011 bytes exactly.
+    assert.strictEqual(absentBytes, byId('cv-011').expected_jcs)
+    // Legacy collapses the two (it strips null), which is precisely why
+    // strict JCS is required for the nested-attestation signature fabric.
+    assert.strictEqual(canonicalize(presentAsNull), canonicalize(absent))
+  })
+
+  it('NEGATIVE: authority_state_at_admission with delegation_expires_at null forks from the absent form', () => {
+    const absent = byId('cv-015').input // delegation_expires_at omitted
+    const presentAsNull = {
+      authority_state_at_admission: {
+        checked_at: '2026-05-01T00:00:00Z',
+        delegation_expires_at: null, // WRONG: should be omitted when unknown
+        delegation_revoked: false,
+        source: 'aps_admission',
+      },
+    }
+    assert.notStrictEqual(
+      canonicalizeJCS(presentAsNull), canonicalizeJCS(absent),
+      'explicit null expiry must not equal the omitted-key signed bytes under JCS',
+    )
+    assert.strictEqual(canonicalizeJCS(absent), byId('cv-015').expected_jcs)
+  })
+
+  it('NEGATIVE: a tampered expected_jcs string does not match the canonical output', () => {
+    // Guards the mirror: if someone hand-edits a vector string wrong, the
+    // round-trip catches it. We assert the genuine pin holds, then that a
+    // mutated copy fails.
+    const v = byId('cv-013')
+    assert.strictEqual(canonicalizeJCS(v.input), v.expected_jcs)
+    const tampered = v.expected_jcs.replace('"divergenceDetails":null,', '')
+    assert.notStrictEqual(canonicalizeJCS(v.input), tampered)
+  })
 })
 
 describe('JCS — Variant Detection', () => {

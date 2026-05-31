@@ -140,5 +140,118 @@
     "expected_legacy": "{\"active\":true,\"revoked\":false}",
     "sha256_jcs": "9135447f8ef8e76a18f1e9b8457c3764002d36b2bf247a0f2ee9eb836dddcd4f",
     "sha256_legacy": "9135447f8ef8e76a18f1e9b8457c3764002d36b2bf247a0f2ee9eb836dddcd4f"
+  },
+  {
+    "id": "cv-011",
+    "description": "witnessAttestation present, nested attestation members present, predictionError absent (key omitted)",
+    "input": {
+      "witnessAttestation": {
+        "attestation": {
+          "constraintsVerified": true,
+          "executionObserved": true,
+          "receiptConsistent": true
+        },
+        "attestedAt": "2026-05-01T00:00:00Z",
+        "observationBasis": "direct_observation",
+        "receiptHash": "sha256:abc",
+        "receiptId": "rcpt-001",
+        "signature": "sig-w1",
+        "witnessId": "wit-001",
+        "witnessRole": "notary"
+      }
+    },
+    "expected_jcs": "{\"witnessAttestation\":{\"attestation\":{\"constraintsVerified\":true,\"executionObserved\":true,\"receiptConsistent\":true},\"attestedAt\":\"2026-05-01T00:00:00Z\",\"observationBasis\":\"direct_observation\",\"receiptHash\":\"sha256:abc\",\"receiptId\":\"rcpt-001\",\"signature\":\"sig-w1\",\"witnessId\":\"wit-001\",\"witnessRole\":\"notary\"}}",
+    "expected_legacy": "{\"witnessAttestation\":{\"attestation\":{\"constraintsVerified\":true,\"executionObserved\":true,\"receiptConsistent\":true},\"attestedAt\":\"2026-05-01T00:00:00Z\",\"observationBasis\":\"direct_observation\",\"receiptHash\":\"sha256:abc\",\"receiptId\":\"rcpt-001\",\"signature\":\"sig-w1\",\"witnessId\":\"wit-001\",\"witnessRole\":\"notary\"}}",
+    "sha256_jcs": "9a28f3d8d281358c97d2f4bdae51baa501e19084bff3b0e03bf2c95553026d11",
+    "sha256_legacy": "9a28f3d8d281358c97d2f4bdae51baa501e19084bff3b0e03bf2c95553026d11"
+  },
+  {
+    "id": "cv-012",
+    "description": "witnessAttestation with predictionError present; nested null at depth diverges JCS vs legacy",
+    "input": {
+      "witnessAttestation": {
+        "attestation": {
+          "constraintsVerified": false,
+          "executionObserved": true,
+          "receiptConsistent": false
+        },
+        "attestedAt": "2026-05-01T00:00:00Z",
+        "observationBasis": "replay_verification",
+        "predictionError": {
+          "divergence": 1,
+          "expectedOutcome": "success",
+          "observedOutcome": null
+        },
+        "receiptHash": "sha256:def",
+        "receiptId": "rcpt-002",
+        "signature": "sig-w2",
+        "witnessId": "wit-002",
+        "witnessRole": "auditor"
+      }
+    },
+    "expected_jcs": "{\"witnessAttestation\":{\"attestation\":{\"constraintsVerified\":false,\"executionObserved\":true,\"receiptConsistent\":false},\"attestedAt\":\"2026-05-01T00:00:00Z\",\"observationBasis\":\"replay_verification\",\"predictionError\":{\"divergence\":1,\"expectedOutcome\":\"success\",\"observedOutcome\":null},\"receiptHash\":\"sha256:def\",\"receiptId\":\"rcpt-002\",\"signature\":\"sig-w2\",\"witnessId\":\"wit-002\",\"witnessRole\":\"auditor\"}}",
+    "expected_legacy": "{\"witnessAttestation\":{\"attestation\":{\"constraintsVerified\":false,\"executionObserved\":true,\"receiptConsistent\":false},\"attestedAt\":\"2026-05-01T00:00:00Z\",\"observationBasis\":\"replay_verification\",\"predictionError\":{\"divergence\":1,\"expectedOutcome\":\"success\"},\"receiptHash\":\"sha256:def\",\"receiptId\":\"rcpt-002\",\"signature\":\"sig-w2\",\"witnessId\":\"wit-002\",\"witnessRole\":\"auditor\"}}",
+    "sha256_jcs": "c3ca2acede21d74d98759db6a32e2e0707557a8cb52811a832b134bfccaf49e5",
+    "sha256_legacy": "5d3aa55bfc4fe5c54c6d8ec8e83dbe983fbdacc455767164f9e76840726c6b75"
+  },
+  {
+    "id": "cv-013",
+    "description": "witnessConflict with divergenceDetails null; JCS preserves, legacy strips (absent-vs-null fork)",
+    "input": {
+      "witnessConflict": {
+        "autoDisputeCandidate": true,
+        "conflictId": "cf-001",
+        "createdAt": "2026-05-01T00:00:00Z",
+        "divergenceDetails": null,
+        "gatewayAssertion": "success",
+        "receiptId": "rcpt-003",
+        "witnessAssertion": "inconsistent"
+      }
+    },
+    "expected_jcs": "{\"witnessConflict\":{\"autoDisputeCandidate\":true,\"conflictId\":\"cf-001\",\"createdAt\":\"2026-05-01T00:00:00Z\",\"divergenceDetails\":null,\"gatewayAssertion\":\"success\",\"receiptId\":\"rcpt-003\",\"witnessAssertion\":\"inconsistent\"}}",
+    "expected_legacy": "{\"witnessConflict\":{\"autoDisputeCandidate\":true,\"conflictId\":\"cf-001\",\"createdAt\":\"2026-05-01T00:00:00Z\",\"gatewayAssertion\":\"success\",\"receiptId\":\"rcpt-003\",\"witnessAssertion\":\"inconsistent\"}}",
+    "sha256_jcs": "1a47b661cb705b114c6322c6e73b4b7ef672e1842b7358975cbb896f43146b7a",
+    "sha256_legacy": "6afcde29236800c836b26f3f34a048d5a4f62c7444164912626ed3e2abf13173"
+  },
+  {
+    "id": "cv-014",
+    "description": "evidenceCommitments array; optional members present in one element, pass null in another",
+    "input": {
+      "evidenceCommitments": [
+        {
+          "committedAt": "2026-05-01T00:00:00Z",
+          "credentialHash": "h1",
+          "issuerKid": "kid-1",
+          "jwks": "https://example/jwks",
+          "pass": true,
+          "type": "wallet_state"
+        },
+        {
+          "committedAt": "2026-05-01T00:00:01Z",
+          "credentialHash": "h2",
+          "pass": null,
+          "type": "compliance_check"
+        }
+      ]
+    },
+    "expected_jcs": "{\"evidenceCommitments\":[{\"committedAt\":\"2026-05-01T00:00:00Z\",\"credentialHash\":\"h1\",\"issuerKid\":\"kid-1\",\"jwks\":\"https://example/jwks\",\"pass\":true,\"type\":\"wallet_state\"},{\"committedAt\":\"2026-05-01T00:00:01Z\",\"credentialHash\":\"h2\",\"pass\":null,\"type\":\"compliance_check\"}]}",
+    "expected_legacy": "{\"evidenceCommitments\":[{\"committedAt\":\"2026-05-01T00:00:00Z\",\"credentialHash\":\"h1\",\"issuerKid\":\"kid-1\",\"jwks\":\"https://example/jwks\",\"pass\":true,\"type\":\"wallet_state\"},{\"committedAt\":\"2026-05-01T00:00:01Z\",\"credentialHash\":\"h2\",\"type\":\"compliance_check\"}]}",
+    "sha256_jcs": "a4ffb9e22131ff225618e530f09cb8e4dc81e36874d88dccf97662578feaace4",
+    "sha256_legacy": "544284284b2473dac8c8a8698f82918a606d873e61fe93b0abfd0c486ec84d8d"
+  },
+  {
+    "id": "cv-015",
+    "description": "authority_state_at_admission present, delegation_expires_at absent (key omitted, not null)",
+    "input": {
+      "authority_state_at_admission": {
+        "checked_at": "2026-05-01T00:00:00Z",
+        "delegation_revoked": false,
+        "source": "aps_admission"
+      }
+    },
+    "expected_jcs": "{\"authority_state_at_admission\":{\"checked_at\":\"2026-05-01T00:00:00Z\",\"delegation_revoked\":false,\"source\":\"aps_admission\"}}",
+    "expected_legacy": "{\"authority_state_at_admission\":{\"checked_at\":\"2026-05-01T00:00:00Z\",\"delegation_revoked\":false,\"source\":\"aps_admission\"}}",
+    "sha256_jcs": "7b011003ee03f94200a77829fc84b54d5a0cb33e868626403b85cf6b5680e6a1",
+    "sha256_legacy": "7b011003ee03f94200a77829fc84b54d5a0cb33e868626403b85cf6b5680e6a1"
   }
 ]
