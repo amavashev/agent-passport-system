@@ -320,6 +320,26 @@ export type {
   ResidualBucket,
 } from './attribution-primitive/index.js'
 
+// v2 Revocation Enforcement (W2-B3) - relying-party decision layer on top of
+// the M4 verifier-hardening recorder. Ships the freshness-policy decision, the
+// ephemeral capability-token FORMAT + local checks, the delegation-refresh
+// reissue path, and the RFC 8417 / CAEP Security Event Token FORMAT and build
+// HOOK. SET distribution and revocation propagation (Bloom filters, streams)
+// are @aeoess/gateway operations and stay out of the SDK.
+export {
+  decideFreshness, enforceFreshnessPolicy,
+  mintEphemeralToken, validateEphemeralToken,
+  refreshDelegation,
+  buildRevocationSET, isWellFormedSET,
+  buildRevocationEnforcementScopeOfClaim,
+} from './revocation-enforcement/index.js'
+export type {
+  FreshnessPolicyMode, StaleAction, FreshnessPolicy, FreshnessDecision,
+  EphemeralCapabilityToken, EphemeralTokenVerdict, RefreshOutcome,
+  SETSubjectId, CAEPRevocationEvent, CAEPEventType,
+  SecurityEventTokenClaims,
+} from './revocation-enforcement/types.js'
+
 // ══════════════════════════════════════
 // Accountability MVP (Wave 1)
 // ══════════════════════════════════════
