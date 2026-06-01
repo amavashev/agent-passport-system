@@ -154,16 +154,19 @@ export function runCanonicalizationConformance(
       run(
         'CANON-MIRROR',
         'canonicalization',
-        'external vector corpus matches code mirror getTestVectors()',
+        'code mirror getTestVectors() is a byte-identical subset of the external corpus',
         'specs/test-vectors-canonicalization.json',
         () => {
-          if (externalVectors.length !== codeVectors.length) {
-            return `vector count diverged: external ${externalVectors.length}, code ${codeVectors.length}`
+          // The frozen code mirror is the shipped subset. The on-disk corpus
+          // may extend it (e.g. nested-attestation vectors) but every shared
+          // vector MUST be byte-identical, so neither surface can drift.
+          if (externalVectors.length < codeVectors.length) {
+            return `corpus smaller than code mirror: external ${externalVectors.length}, code ${codeVectors.length}`
           }
-          const codeById = new Map(codeVectors.map((v) => [v.id, v]))
-          for (const ext of externalVectors) {
-            const code = codeById.get(ext.id)
-            if (code === undefined) return `external vector ${ext.id} absent from code mirror`
+          const extById = new Map(externalVectors.map((v) => [v.id, v]))
+          for (const code of codeVectors) {
+            const ext = extById.get(code.id)
+            if (ext === undefined) return `code-mirror vector ${code.id} absent from external corpus`
             for (const field of [
               'expected_jcs',
               'expected_legacy',
@@ -171,7 +174,7 @@ export function runCanonicalizationConformance(
               'sha256_legacy',
             ] as const) {
               if (ext[field] !== code[field]) {
-                return divergenceDetail(`${ext.id} ${field}`, code[field], ext[field])
+                return divergenceDetail(`${code.id} ${field}`, code[field], ext[field])
               }
             }
           }

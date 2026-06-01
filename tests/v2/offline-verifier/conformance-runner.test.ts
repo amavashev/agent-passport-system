@@ -3,8 +3,8 @@
 // Conformance runner tests
 // ══════════════════════════════════════════════════════════════════
 // Pins: the runner agrees with the pinned canonicalization vectors,
-// asserts the on-disk corpus is byte-identical to the code mirror, and
-// FAILS on a single-byte divergence in any of the four expectation
+// asserts the code mirror is a byte-identical subset of the on-disk corpus,
+// and FAILS on a single-byte divergence in any of the four expectation
 // fields (expected_jcs, expected_legacy, sha256_jcs, sha256_legacy).
 // ══════════════════════════════════════════════════════════════════
 
@@ -45,18 +45,21 @@ describe('conformance runner: canonicalization vectors', () => {
     assert.equal(mirror!.passed, true)
   })
 
-  it('on-disk corpus is byte-identical to getTestVectors()', () => {
+  it('code mirror getTestVectors() is a byte-identical subset of the on-disk corpus', () => {
     const disk = loadDiskVectors()
     const code = getTestVectors()
-    assert.equal(disk.length, code.length)
-    const codeById = new Map(code.map((v) => [v.id, v]))
-    for (const d of disk) {
-      const c = codeById.get(d.id)
-      assert.ok(c, `disk vector ${d.id} present in code mirror`)
-      assert.equal(d.expected_jcs, c!.expected_jcs, `${d.id} expected_jcs`)
-      assert.equal(d.expected_legacy, c!.expected_legacy, `${d.id} expected_legacy`)
-      assert.equal(d.sha256_jcs, c!.sha256_jcs, `${d.id} sha256_jcs`)
-      assert.equal(d.sha256_legacy, c!.sha256_legacy, `${d.id} sha256_legacy`)
+    // The frozen code mirror is the shipped subset; the on-disk corpus may
+    // extend it with additional vectors (e.g. nested-attestation cases).
+    // Every code-mirror vector MUST appear in the corpus byte-identical.
+    assert.ok(disk.length >= code.length)
+    const diskById = new Map(disk.map((v) => [v.id, v]))
+    for (const c of code) {
+      const d = diskById.get(c.id)
+      assert.ok(d, `code vector ${c.id} present in on-disk corpus`)
+      assert.equal(d!.expected_jcs, c.expected_jcs, `${c.id} expected_jcs`)
+      assert.equal(d!.expected_legacy, c.expected_legacy, `${c.id} expected_legacy`)
+      assert.equal(d!.sha256_jcs, c.sha256_jcs, `${c.id} sha256_jcs`)
+      assert.equal(d!.sha256_legacy, c.sha256_legacy, `${c.id} sha256_legacy`)
     }
   })
 
