@@ -1881,3 +1881,19 @@ export {
   verifyWithSigner,
   buildRemoteSignerScopeOfClaim,
 } from './adapters/remote-signer/index.js'
+
+// ── W2-A1 Evidence Descriptor: canonical builder + advisory layer ──
+// The descriptor types and the buildDescriptor alias already reach the
+// public surface via the offline verifier (both sourced from
+// src/v2/assurance). Here we expose A1's canonical builder name and the
+// verifier-derived advisory layer that sits on top of the Belnap
+// descriptor. Assurance is verifier-derived OUTPUT only; nothing exported
+// here reads an issuer-set grade.
+export {
+  buildEvidenceDescriptor,
+  computeAdvisoryScalar,
+  generalizeBilateralVerification,
+  DEFAULT_OBSERVATION_WEIGHTS,
+  type AdvisoryScalar,
+  type BilateralVerificationLike,
+} from './v2/assurance/descriptor.js'
