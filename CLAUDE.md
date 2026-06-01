@@ -8,4 +8,4 @@ The same content applies whether you are Claude Code, another coding agent, or a
 
 ---
 
-**Current SDK version: 2.6.0-alpha.3.** This anchor is kept in sync by `aeoess_web/scripts/propagate.mjs` from `project-state.json`; if you see a drift here, run the propagation sweep before continuing.
+**Current SDK version: 2.6.0-alpha.9.** This anchor is kept in sync by `aeoess_web/scripts/propagate.mjs` from `project-state.json`; if you see a drift here, run the propagation sweep before continuing.
