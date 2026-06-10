@@ -45,9 +45,11 @@
 //   derivation") → EVIDENCE_SIGNATURE_INVALID on failure. A passing result
 //   reports `evidence_authenticity`: 'signature_valid' (bytes verify against
 //   signer_did) or 'pinned_issuer' (that PLUS expected_signer pinning the
-//   receipt issuer = full authenticity for the pinned case). Dynamic
-//   signer-AUTHORITY resolution for the unpinned case — (b) — is the v0.2
-//   work tracked at runcycles/cycles-protocol#103, not done here.
+//   APS receipt issuer — envelope authenticity then holds TRANSITIVELY, to
+//   the extent the pinned issuer is trusted to bind only legitimate
+//   envelopes; not a proof of signer_did's own authority). Resolving
+//   signer-AUTHORITY directly — (b) — is the v0.2 work tracked at
+//   runcycles/cycles-protocol#103, not done here.
 //
 // Out of scope for this commit (TODO follow-up):
 //   - (b) envelope signer-authority resolution (did:cycles / JWKS /
@@ -561,8 +563,9 @@ function _checkEvidenceJoin(
  * Build the passing result, tagging envelope authenticity (APS#43) when an
  * envelope was supplied. Reaching here with `options.evidence` set means the
  * join check passed, i.e. the envelope's signature verified ((a) held), so
- * the tag is 'pinned_issuer' when the receipt issuer is pinned via
- * `expected_signer` (full authenticity for the pinned case) and
+ * the tag is 'pinned_issuer' when the APS receipt issuer is pinned via
+ * `expected_signer` (envelope authenticity then holds transitively through
+ * the trusted issuer — not a direct proof of signer_did authority) and
  * 'signature_valid' otherwise. Omitted entirely when no envelope was passed.
  */
 function _validResult(options: VerifyCyclesOptions): CyclesVerifyResult {

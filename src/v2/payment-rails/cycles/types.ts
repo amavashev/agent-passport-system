@@ -305,10 +305,15 @@ export type CyclesVerifyReason =
  *      self-sign a consistent envelope, so signature_valid alone is not
  *      authenticity.
  *  - 'pinned_issuer'   : signature_valid AND the caller pinned the receipt
- *      issuer via `expected_signer` (enforced separately). The pin supplies
- *      the trust anchor (the manual form of (b)), so for the pinned-issuer
- *      case this IS full authenticity. Dynamic signer-authority resolution
- *      for the unpinned case is (b), gated on runcycles/cycles-protocol#103.
+ *      issuer via `expected_signer` (enforced separately). NOTE the pin is on
+ *      the APS *receipt* signer (`obj.signer`), not the envelope's
+ *      `signer_did`. Envelope authenticity is therefore TRANSITIVE: it holds
+ *      only insofar as you trust the pinned receipt issuer to have bound this
+ *      receipt solely to a legitimate Cycles envelope. This is the manual
+ *      form of (b) — a trust assumption about the pinned issuer, not a
+ *      cryptographic proof of `signer_did`'s authority. Resolving that
+ *      authority directly (so the unpinned case is also covered) is (b),
+ *      gated on runcycles/cycles-protocol#103.
  */
 export type EvidenceAuthenticity = 'signature_valid' | 'pinned_issuer'
 
